@@ -12,7 +12,7 @@ hilt-navigation-compose = "1.2.0"
 room = "2.6.1"
 security-crypto = "1.1.0-alpha06"
 biometric = "1.1.0"
-geckoview = "124.0.0"
+geckoview = "124.0.20240308092627"
 coroutines = "1.7.3"
 
 [libraries]
