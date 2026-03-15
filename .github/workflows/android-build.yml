@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  build-release-aab:
+  build-release-apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,11 +25,11 @@ jobs:
         with:
           gradle-version: 8.14.3
 
-      - name: Build release AAB
-        run: ./gradlew bundleRelease
+      - name: Build release APKs (ABI split)
+        run: ./gradlew assembleRelease
 
-      - name: Upload release AAB artifact
+      - name: Upload release APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: horizonweb-release-aab
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: horizonweb-release-apks
+          path: app/build/outputs/apk/release/*.apk
