@@ -12,6 +12,7 @@ hilt-navigation-compose = "1.2.0"
 room = "2.6.1"
 security-crypto = "1.1.0-alpha06"
 biometric = "1.1.0"
+material = "1.11.0"
 geckoview = "latest.release"
 coroutines = "1.7.3"
 
@@ -40,6 +41,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
+google-material = { module = "com.google.android.material:material", version.ref = "material" }
 
 mozilla-geckoview = { module = "org.mozilla.geckoview:geckoview", version.ref = "geckoview" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }

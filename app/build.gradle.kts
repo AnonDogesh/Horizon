@@ -68,7 +68,8 @@ configurations.configureEach {
             "androidx.core:core:${libs.versions.core.ktx.get()}",
             "androidx.lifecycle:lifecycle-runtime-compose:${libs.versions.lifecycle.get()}",
             "androidx.lifecycle:lifecycle-viewmodel-compose:${libs.versions.lifecycle.get()}",
-            "androidx.lifecycle:lifecycle-runtime-ktx:${libs.versions.lifecycle.get()}"
+            "androidx.lifecycle:lifecycle-runtime-ktx:${libs.versions.lifecycle.get()}",
+            "androidx.lifecycle:lifecycle-runtime:${libs.versions.lifecycle.get()}"
         )
     }
 }
@@ -76,7 +77,6 @@ configurations.configureEach {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
@@ -99,6 +99,7 @@ dependencies {
 
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
+    implementation(libs.google.material)
 
     implementation(libs.mozilla.geckoview)
     implementation(libs.kotlinx.coroutines.android)
