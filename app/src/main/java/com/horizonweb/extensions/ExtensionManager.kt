@@ -74,16 +74,30 @@ class ExtensionManager @Inject constructor(
         scope.launch {
             val extension = extensionRefs[extensionId] ?: return@launch
             try {
-                if (enabled) {
-                    await(controller.enable(extension))
-                } else {
-                    await(controller.disable(extension))
-                }
+                setExtensionEnabled(extension, enabled)
                 refreshInstalledExtensions()
             } catch (t: Throwable) {
                 _message.value = t.message ?: "Failed to update extension state"
             }
         }
+    }
+
+
+    private suspend fun setExtensionEnabled(extension: WebExtension, enabled: Boolean) {
+        val methodName = if (enabled) "enable" else "disable"
+        val methods = controller.javaClass.methods.filter { it.name == methodName }
+        val target = methods.firstOrNull { it.parameterTypes.size >= 1 } ?: error("No $methodName method")
+        val args = buildList {
+            add(extension)
+            repeat(target.parameterTypes.size - 1) {
+                add(null)
+            }
+        }.toTypedArray()
+
+        @Suppress("UNCHECKED_CAST")
+        val result = target.invoke(controller, *args) as? GeckoResult<Any?>
+            ?: error("$methodName did not return GeckoResult")
+        await(result)
     }
 
     fun uninstall(extensionId: String) {
@@ -103,12 +117,13 @@ class ExtensionManager @Inject constructor(
         result.accept(
             { value ->
                 if (cont.isActive) {
-                    cont.resume(value)
+                    @Suppress("UNCHECKED_CAST")
+                    cont.resume(value as T)
                 }
             },
             { throwable ->
                 if (cont.isActive) {
-                    cont.resumeWithException(throwable)
+                    cont.resumeWithException(throwable ?: RuntimeException("Unknown GeckoResult error"))
                 }
             }
         )
