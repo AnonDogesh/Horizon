@@ -41,7 +41,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
 androidx-biometric = { module = "androidx.biometric:biometric", version.ref = "biometric" }
 
-mozilla-geckoview = { module = "org.mozilla.geckoview:geckoview", version.ref = "geckoview" }
+mozilla-geckoview = { module = "org.mozilla.geckoview:geckoview-nightly", version.ref = "geckoview" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 
 [plugins]
