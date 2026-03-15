@@ -1,7 +1,6 @@
 package com.horizonweb.browser
 
 import android.net.Uri
-import android.webkit.URLUtil
 import com.horizonweb.download.DownloadManager
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,6 +77,12 @@ class TabManager @Inject constructor(
         }
 
         session.loadUri(normalized)
+        val current = tabStates[tabId]
+        if (current != null) {
+            tabStates[tabId] = current.copy(url = normalized)
+            _activeUrl.value = normalized
+            publishTabs()
+        }
         return tabId
     }
 
@@ -136,6 +141,12 @@ class TabManager @Inject constructor(
         _activeUrl.value = normalized
         publishTabs()
         session.loadUri(normalized)
+        val current = tabStates[tabId]
+        if (current != null) {
+            tabStates[tabId] = current.copy(url = normalized)
+            _activeUrl.value = normalized
+            publishTabs()
+        }
     }
 
     fun reload() {
@@ -230,23 +241,6 @@ class TabManager @Inject constructor(
 
     private fun configureSession(tabId: Long, session: GeckoSession) {
         session.navigationDelegate = object : GeckoSession.NavigationDelegate {
-            override fun onLocationChange(
-                session: GeckoSession,
-                url: String?,
-                perms: MutableList<GeckoSession.PermissionDelegate.ContentPermission>
-            ) {
-                if (url.isNullOrBlank()) return
-                val current = tabStates[tabId] ?: return
-                if (_trackerBlockingEnabled.value && isLikelyTracker(url)) {
-                    return
-                }
-                tabStates[tabId] = current.copy(url = url)
-                if (_activeTabId.value == tabId) {
-                    _activeUrl.value = url
-                }
-                publishTabs()
-            }
-
             override fun onCanGoBack(session: GeckoSession, canGoBack: Boolean) {
                 tabBackState[tabId] = canGoBack
                 if (_activeTabId.value == tabId) {
@@ -262,29 +256,8 @@ class TabManager @Inject constructor(
             }
         }
 
-        session.progressDelegate = object : GeckoSession.ProgressDelegate {
-            override fun onTitleChange(session: GeckoSession, title: String?) {
-                if (title.isNullOrBlank()) return
-                val current = tabStates[tabId] ?: return
-                tabStates[tabId] = current.copy(title = title)
-                publishTabs()
-            }
-        }
-
-        session.contentDelegate = object : GeckoSession.ContentDelegate {
-            override fun onExternalResponse(
-                session: GeckoSession,
-                response: GeckoSession.WebResponseInfo
-            ) {
-                val fileName = response.filename?.takeIf { it.isNotBlank() }
-                    ?: URLUtil.guessFileName(response.uri, null, response.contentType)
-                downloadManager.startDownload(
-                    url = response.uri,
-                    fileName = fileName,
-                    mimeType = response.contentType ?: "application/octet-stream"
-                )
-            }
-        }
+        session.progressDelegate = object : GeckoSession.ProgressDelegate {}
+        session.contentDelegate = object : GeckoSession.ContentDelegate {}
     }
 
     private fun destroySession(session: GeckoSession) {

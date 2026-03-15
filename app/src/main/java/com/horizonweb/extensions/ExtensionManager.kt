@@ -75,9 +75,9 @@ class ExtensionManager @Inject constructor(
             val extension = extensionRefs[extensionId] ?: return@launch
             try {
                 if (enabled) {
-                    await(controller.enable(extension, org.mozilla.geckoview.WebExtensionController.EnableSource.USER))
+                    await(controller.enable(extension))
                 } else {
-                    await(controller.disable(extension, org.mozilla.geckoview.WebExtensionController.DisableSource.USER))
+                    await(controller.disable(extension))
                 }
                 refreshInstalledExtensions()
             } catch (t: Throwable) {
@@ -100,9 +100,17 @@ class ExtensionManager @Inject constructor(
     }
 
     private suspend fun <T> await(result: GeckoResult<T>): T = suspendCancellableCoroutine { cont ->
-        result.then(
-            { value -> cont.resume(value) },
-            { throwable -> cont.resumeWithException(throwable) }
+        result.accept(
+            { value ->
+                if (cont.isActive) {
+                    cont.resume(value)
+                }
+            },
+            { throwable ->
+                if (cont.isActive) {
+                    cont.resumeWithException(throwable)
+                }
+            }
         )
     }
 }
