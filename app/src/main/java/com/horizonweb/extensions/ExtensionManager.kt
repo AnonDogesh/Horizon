@@ -41,7 +41,8 @@ class ExtensionManager @Inject constructor(
                 require(normalized.startsWith("https://") && normalized.endsWith(".xpi")) {
                     "Extension URL must be HTTPS and end with .xpi"
                 }
-                await(controller.install(normalized))
+                val installed = await(controller.install(normalized))
+                installed?.let { extensionRefs[it.id] = it }
                 _message.value = "Extension installed"
                 refreshInstalledExtensions()
             } catch (t: Throwable) {
@@ -53,7 +54,7 @@ class ExtensionManager @Inject constructor(
     fun refreshInstalledExtensions() {
         scope.launch {
             try {
-                val list = await(controller.list())
+                val list = await(controller.list()).orEmpty()
                 extensionRefs.clear()
                 _extensions.value = list.map { ext ->
                     extensionRefs[ext.id] = ext
@@ -113,12 +114,12 @@ class ExtensionManager @Inject constructor(
         }
     }
 
-    private suspend fun <T> await(result: GeckoResult<T>): T = suspendCancellableCoroutine { cont ->
+    private suspend fun <T> await(result: GeckoResult<T>): T? = suspendCancellableCoroutine { cont ->
         result.accept(
             { value ->
                 if (cont.isActive) {
                     @Suppress("UNCHECKED_CAST")
-                    cont.resume(value as T)
+                    cont.resume(value as T?)
                 }
             },
             { throwable ->
