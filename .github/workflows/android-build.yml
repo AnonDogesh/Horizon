@@ -4,7 +4,7 @@ on:
   push:
 
 jobs:
-  build-release-aab:
+  build-release-apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,11 +25,36 @@ jobs:
         with:
           gradle-version: 8.14.3
 
-      - name: Build release AAB
-        run: ./gradlew bundleRelease
+      - name: Build release APKs (ABI split)
+        run: ./gradlew assembleRelease
 
-      - name: Upload release AAB artifact
+      - name: Show generated release APKs
+        run: ls -lh app/build/outputs/apk/release/
+
+      - name: Upload arm64-v8a release APK
         uses: actions/upload-artifact@v4
         with:
-          name: horizonweb-release-aab
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: horizonweb-release-arm64-v8a
+          path: app/build/outputs/apk/release/*-arm64-v8a-release*.apk
+          if-no-files-found: error
+
+      - name: Upload armeabi-v7a release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizonweb-release-armeabi-v7a
+          path: app/build/outputs/apk/release/*-armeabi-v7a-release*.apk
+          if-no-files-found: error
+
+      - name: Upload x86 release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizonweb-release-x86
+          path: app/build/outputs/apk/release/*-x86-release*.apk
+          if-no-files-found: error
+
+      - name: Upload x86_64 release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: horizonweb-release-x86_64
+          path: app/build/outputs/apk/release/*-x86_64-release*.apk
+          if-no-files-found: error

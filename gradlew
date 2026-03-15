@@ -102,6 +102,32 @@ die () {
     exit 1
 } >&2
 
+find_compatible_java_home() {
+    for candidate in \
+        "$JAVA_HOME_17_X64" \
+        "$JAVA17_HOME" \
+        "$HOME/.local/share/mise/installs/java/17.0.2" \
+        "/usr/lib/jvm/temurin-17-jdk-amd64" \
+        "/usr/lib/jvm/java-17-openjdk-amd64" \
+        "/usr/lib/jvm/java-17-openjdk"
+    do
+        if [ -n "$candidate" ] && [ -x "$candidate/bin/java" ]; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+java_major_version() {
+    version=$1
+    case "$version" in
+        1.*) printf '%s' "${version#1.}" | cut -d. -f1 ;;
+        *) printf '%s' "$version" | cut -d. -f1 ;;
+    esac
+}
+
 # OS specific support (must be 'true' or 'false').
 cygwin=false
 msys=false
@@ -115,6 +141,55 @@ case "$( uname )" in                #(
 esac
 
 CLASSPATH="\\\"\\\""
+
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+WRAPPER_PROPERTIES="$APP_HOME/gradle/wrapper/gradle-wrapper.properties"
+
+bootstrap_wrapper_jar() {
+    [ -f "$WRAPPER_PROPERTIES" ] || die "ERROR: Missing Gradle wrapper properties at $WRAPPER_PROPERTIES"
+
+    distribution_url=$(sed -n 's/^distributionUrl=//p' "$WRAPPER_PROPERTIES")
+    distribution_url=$(printf '%s' "$distribution_url" | sed 's/\\:/:/g')
+    [ -n "$distribution_url" ] || die "ERROR: distributionUrl is missing in $WRAPPER_PROPERTIES"
+
+    command -v curl >/dev/null 2>&1 || die "ERROR: gradle-wrapper.jar is missing and curl is not available to bootstrap it"
+    command -v unzip >/dev/null 2>&1 || die "ERROR: gradle-wrapper.jar is missing and unzip is not available to bootstrap it"
+
+    tmpdir=$(mktemp -d 2>/dev/null || mktemp -d -t gradle-wrapper)
+    trap 'rm -rf "$tmpdir"' EXIT INT TERM
+
+    if ! curl -fsSL "$distribution_url" -o "$tmpdir/gradle-dist.zip"; then
+        die "ERROR: Failed to download Gradle distribution from $distribution_url"
+    fi
+
+    wrapper_main_path=$(unzip -Z1 "$tmpdir/gradle-dist.zip" | sed -n 's#^\(gradle-[^/]*/lib/plugins/gradle-wrapper-main-[^/]*\.jar\)$#\1#p' | head -n 1)
+    [ -n "$wrapper_main_path" ] || die "ERROR: Unable to find gradle-wrapper-main JAR in downloaded Gradle distribution"
+
+    if ! unzip -p "$tmpdir/gradle-dist.zip" "$wrapper_main_path" > "$tmpdir/gradle-wrapper-main.jar"; then
+        die "ERROR: Failed to extract $wrapper_main_path from Gradle distribution"
+    fi
+
+    if ! unzip -p "$tmpdir/gradle-wrapper-main.jar" gradle-wrapper.jar > "$WRAPPER_JAR"; then
+        die "ERROR: Failed to extract nested gradle-wrapper.jar from $wrapper_main_path"
+    fi
+
+    [ -s "$WRAPPER_JAR" ] || die "ERROR: Bootstrapped gradle-wrapper.jar is empty"
+    chmod 644 "$WRAPPER_JAR" 2>/dev/null || true
+}
+
+if [ ! -f "$WRAPPER_JAR" ]; then
+    if command -v gradle >/dev/null 2>&1; then
+        if compatible_java_home=$(find_compatible_java_home); then
+            JAVA_HOME=$compatible_java_home
+            export JAVA_HOME
+            PATH="$JAVA_HOME/bin:$PATH"
+            export PATH
+        fi
+        warn "gradle-wrapper.jar is missing; falling back to system Gradle executable"
+        exec gradle "$@"
+    fi
+    bootstrap_wrapper_jar
+fi
 
 
 # Determine the Java command to use to start the JVM.
@@ -139,6 +214,19 @@ else
 
 Please set the JAVA_HOME variable in your environment to match the
 location of your Java installation."
+    fi
+fi
+
+JAVA_VERSION_RAW=$("$JAVACMD" -version 2>&1 | sed -n '1s/.*"\([^"]*\)".*/\1/p')
+JAVA_MAJOR=$(java_major_version "$JAVA_VERSION_RAW")
+if [ -n "$JAVA_MAJOR" ] && [ "$JAVA_MAJOR" -gt 21 ] 2>/dev/null; then
+    if compatible_java_home=$(find_compatible_java_home); then
+        JAVA_HOME=$compatible_java_home
+        export JAVA_HOME
+        JAVACMD=$JAVA_HOME/bin/java
+        PATH="$JAVA_HOME/bin:$PATH"
+        export PATH
+        warn "Detected Java $JAVA_MAJOR; switching to compatible Java at $JAVA_HOME"
     fi
 fi
 
@@ -213,7 +301,7 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
         -classpath "$CLASSPATH" \
-        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+        -jar "$WRAPPER_JAR" \
         "$@"
 
 # Stop when "xargs" is not available.
