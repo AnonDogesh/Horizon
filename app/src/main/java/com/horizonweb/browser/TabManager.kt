@@ -3,11 +3,13 @@ package com.horizonweb.browser
 import android.net.Uri
 import com.horizonweb.download.DownloadManager
 import javax.inject.Inject
+import dagger.hilt.android.scopes.ViewModelScoped
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.mozilla.geckoview.GeckoSession
 
+@ViewModelScoped
 class TabManager @Inject constructor(
     private val downloadManager: DownloadManager,
     runtimeProvider: GeckoRuntimeProvider
