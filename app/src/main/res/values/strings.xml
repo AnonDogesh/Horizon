@@ -1,0 +1,92 @@
+<resources>
+    <string name="app_name">Horizon</string>
+    <string name="app_brand">HORIZON</string>
+    <string name="home_headline">Secure your digital space.</string>
+
+    <string name="hint_search">Search the web securely</string>
+    <string name="action_search">Search</string>
+    <string name="action_profile">Profile</string>
+
+    <string name="action_go">Go</string>
+    <string name="action_menu">Menu</string>
+    <string name="action_back">Back</string>
+    <string name="action_forward">Forward</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_tabs">Tabs</string>
+    <string name="action_vault">Vault</string>
+    <string name="action_go_home">Home</string>
+    <string name="action_clear_cache">Clear cache</string>
+    <string name="action_settings">Settings</string>
+    <string name="action_add_file">Add File</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_mail">Mail</string>
+    <string name="action_daily">Daily</string>
+    <string name="action_market">Market</string>
+    <string name="action_cloud">Cloud</string>
+    <string name="action_add">Add</string>
+    <string name="action_customize_feed">Customize Feed</string>
+    <string name="action_clear_history">Clear history</string>
+    <string name="action_voice">Voice</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_new_tab">New tab</string>
+    <string name="msg_voice_not_ready">Voice search is coming soon</string>
+    <string name="action_private_vault">Private Vault</string>
+    <string name="action_bookmarks">Bookmarks</string>
+    <string name="action_downloads">Downloads</string>
+    <string name="action_desktop_site">Desktop Site</string>
+    <string name="msg_bookmark_saved">Saved to bookmarks</string>
+    <string name="msg_no_bookmarks">No bookmarks yet</string>
+    <string name="msg_downloads_not_available">Downloads page is not available on this device</string>
+    <string name="settings_profile_name">Alex Harrison</string>
+    <string name="settings_profile_email">alex.harrison@horizon.com</string>
+    <string name="action_manage_account">Manage Account</string>
+    <string name="settings_browser_config">BROWSER CONFIGURATION</string>
+    <string name="settings_information">INFORMATION</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_desc">Themes, dark mode, and sidebar</string>
+    <string name="settings_privacy">Privacy &amp; Security</string>
+    <string name="settings_privacy_desc">Manage data, ad-blocking, and tracking</string>
+    <string name="settings_download_desc">Default location and file handling</string>
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_desc">Developer tools, flags, and tuning</string>
+    <string name="settings_about">About Horizon</string>
+    <string name="settings_about_desc">Version 2.4.0 (Stable Build)</string>
+    <string name="settings_help">Help &amp; Feedback</string>
+    <string name="settings_help_desc">Contact support or report a bug</string>
+    <string name="settings_footer">HORIZON OS</string>
+    <string name="settings_footer_sub">Design Build 2024.11.02</string>
+    <string name="msg_manage_account">Account management coming soon</string>
+    <string name="msg_appearance_opened">Appearance settings coming soon</string>
+    <string name="msg_advanced_opened">Advanced settings coming soon</string>
+    <string name="msg_help_not_available">No email app found</string>
+
+    <string name="setting_ad_blocker">Ad blocker</string>
+    <string name="setting_javascript">JavaScript enabled</string>
+    <string name="setting_desktop_mode">Desktop mode</string>
+
+    <string name="nav_home">HOME</string>
+    <string name="nav_history">HISTORY</string>
+    <string name="nav_settings">SETTINGS</string>
+    <string name="nav_menu">MENU</string>
+
+    <string name="home_for_you">For You</string>
+    <string name="card_primary">The Future of Post-Quantum Encryption is Here</string>
+    <string name="card_secondary">Market trends for high-net-worth investors in 2024</string>
+    <string name="card_tertiary">The shift towards regional digital sovereignty</string>
+
+    <string name="title_delete_file">Delete file?</string>
+    <string name="msg_no_back_history">No previous page</string>
+    <string name="msg_no_forward_history">No next page</string>
+    <string name="msg_tabs_placeholder">Tabs manager coming soon</string>
+    <string name="msg_cache_cleared">Web cache cleared</string>
+    <string name="msg_invalid_video_url">Invalid video URL</string>
+    <string name="msg_file_added_to_vault">File added to vault</string>
+    <string name="msg_file_add_failed">Failed to add file to vault</string>
+    <string name="msg_file_deleted">File deleted</string>
+    <string name="msg_file_delete_failed">Could not delete file</string>
+    <string name="msg_delete_file_confirm">Delete %1$s from vault?</string>
+    <string name="msg_enter_search">Enter a search term or URL</string>
+    <string name="msg_no_history">No browsing history yet</string>
+    <string name="msg_history_cleared">History cleared</string>
+    <string name="msg_home_active">Home page is already open</string>
+</resources>
