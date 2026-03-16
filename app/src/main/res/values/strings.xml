@@ -12,12 +12,19 @@
     <string name="action_clear_cache">Clear cache</string>
     <string name="action_ad_block_on">Ad Block: ON</string>
     <string name="action_ad_block_off">Ad Block: OFF</string>
+    <string name="action_add_file">Add File</string>
+    <string name="action_delete">Delete</string>
+    <string name="title_delete_file">Delete file?</string>
     <string name="msg_no_back_history">No previous page</string>
     <string name="msg_no_forward_history">No next page</string>
     <string name="msg_tabs_placeholder">Tabs manager coming soon</string>
     <string name="msg_cache_cleared">Web cache cleared</string>
-    <string name="msg_vault_placeholder">Vault screen placeholder</string>
     <string name="msg_ad_block_enabled">Ad blocking enabled</string>
     <string name="msg_ad_block_disabled">Ad blocking disabled</string>
     <string name="msg_invalid_video_url">Invalid video URL</string>
+    <string name="msg_file_added_to_vault">File added to vault</string>
+    <string name="msg_file_add_failed">Failed to add file to vault</string>
+    <string name="msg_file_deleted">File deleted</string>
+    <string name="msg_file_delete_failed">Could not delete file</string>
+    <string name="msg_delete_file_confirm">Delete %1$s from vault?</string>
 </resources>
