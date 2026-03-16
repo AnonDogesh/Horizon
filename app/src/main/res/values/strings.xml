@@ -19,4 +19,5 @@
     <string name="msg_vault_placeholder">Vault screen placeholder</string>
     <string name="msg_ad_block_enabled">Ad blocking enabled</string>
     <string name="msg_ad_block_disabled">Ad blocking disabled</string>
+    <string name="msg_invalid_video_url">Invalid video URL</string>
 </resources>

@@ -2,6 +2,7 @@ package com.dean.browservault
 
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.webkit.URLUtil
@@ -16,6 +17,7 @@ import androidx.appcompat.widget.PopupMenu
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import java.io.ByteArrayInputStream
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -75,6 +77,18 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     super.shouldInterceptRequest(view, request)
                 }
+            }
+
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: WebResourceRequest
+            ): Boolean {
+                val targetUrl = request.url.toString()
+                if (request.isForMainFrame && isVideoUrl(targetUrl)) {
+                    openVideoPlayer(targetUrl)
+                    return true
+                }
+                return false
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
@@ -145,7 +159,13 @@ class MainActivity : AppCompatActivity() {
 
                 MENU_AD_BLOCK -> {
                     isAdBlockEnabled = !isAdBlockEnabled
-                    toast(if (isAdBlockEnabled) getString(R.string.msg_ad_block_enabled) else getString(R.string.msg_ad_block_disabled))
+                    toast(
+                        if (isAdBlockEnabled) {
+                            getString(R.string.msg_ad_block_enabled)
+                        } else {
+                            getString(R.string.msg_ad_block_disabled)
+                        }
+                    )
                     webView.reload()
                     true
                 }
@@ -171,8 +191,25 @@ class MainActivity : AppCompatActivity() {
             URLUtil.isValidUrl(rawInput) -> rawInput
             else -> "https://$rawInput"
         }
-        webView.loadUrl(resolvedUrl)
+
+        if (isVideoUrl(resolvedUrl)) {
+            openVideoPlayer(resolvedUrl)
+        } else {
+            webView.loadUrl(resolvedUrl)
+        }
         urlInput.clearFocus()
+    }
+
+    private fun isVideoUrl(url: String): Boolean {
+        val lower = Uri.parse(url).toString().lowercase(Locale.US)
+        return VIDEO_EXTENSIONS.any { extension -> lower.contains(extension) }
+    }
+
+    private fun openVideoPlayer(videoUrl: String) {
+        startActivity(
+            Intent(this, VideoPlayerActivity::class.java)
+                .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, videoUrl)
+        )
     }
 
     private fun toast(message: String) {
@@ -183,5 +220,6 @@ class MainActivity : AppCompatActivity() {
         private const val MENU_HOME = 1
         private const val MENU_CLEAR_CACHE = 2
         private const val MENU_AD_BLOCK = 3
+        private val VIDEO_EXTENSIONS = listOf(".mp4", ".m3u8", ".webm")
     }
 }
