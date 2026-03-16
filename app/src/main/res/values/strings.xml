@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Horizon</string>
+    <string name="hint_enter_url">Enter URL</string>
+    <string name="action_go">Go</string>
+    <string name="action_menu">Menu</string>
+    <string name="action_back">Back</string>
+    <string name="action_forward">Forward</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_tabs">Tabs</string>
+    <string name="action_vault">Vault</string>
+    <string name="action_go_home">Home</string>
+    <string name="action_clear_cache">Clear cache</string>
+    <string name="action_ad_block_on">Ad Block: ON</string>
+    <string name="action_ad_block_off">Ad Block: OFF</string>
+    <string name="msg_no_back_history">No previous page</string>
+    <string name="msg_no_forward_history">No next page</string>
+    <string name="msg_tabs_placeholder">Tabs manager coming soon</string>
+    <string name="msg_cache_cleared">Web cache cleared</string>
+    <string name="msg_vault_placeholder">Vault screen placeholder</string>
+    <string name="msg_ad_block_enabled">Ad blocking enabled</string>
+    <string name="msg_ad_block_disabled">Ad blocking disabled</string>
+</resources>
