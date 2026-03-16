@@ -1,6 +1,8 @@
 package com.dean.browservault
 
+import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -19,21 +21,28 @@ import com.google.android.material.textfield.TextInputEditText
 import java.io.ByteArrayInputStream
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
 
     private lateinit var webView: WebView
     private lateinit var urlInput: TextInputEditText
+    private lateinit var prefs: SharedPreferences
+
     private val adBlocker = AdBlocker()
     private var isAdBlockEnabled = true
+    private var defaultUserAgent: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        prefs = getSharedPreferences(BrowserPreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        initializeDefaultSettingsIfMissing()
+
         webView = findViewById(R.id.webView)
         urlInput = findViewById(R.id.urlInput)
 
         configureWebView(webView)
+        applyBrowserSettings(reloadPage = false)
         setupUiActions()
 
         onBackPressedDispatcher.addCallback(this) {
@@ -49,11 +58,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        prefs.registerOnSharedPreferenceChangeListener(this)
+        applyBrowserSettings(reloadPage = false)
+    }
+
+    override fun onStop() {
+        prefs.unregisterOnSharedPreferenceChangeListener(this)
+        super.onStop()
+    }
+
+    override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
+        if (key in setOf(
+                BrowserPreferences.KEY_AD_BLOCKER,
+                BrowserPreferences.KEY_JAVASCRIPT,
+                BrowserPreferences.KEY_DESKTOP_MODE
+            )
+        ) {
+            applyBrowserSettings(reloadPage = true)
+        }
+    }
+
     @Suppress("SetJavaScriptEnabled")
     private fun configureWebView(target: WebView) {
         target.setBackgroundColor(Color.BLACK)
         target.settings.apply {
-            javaScriptEnabled = true
+            defaultUserAgent = userAgentString
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = true
@@ -100,6 +131,38 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun initializeDefaultSettingsIfMissing() {
+        if (!prefs.contains(BrowserPreferences.KEY_AD_BLOCKER)) {
+            prefs.edit().putBoolean(BrowserPreferences.KEY_AD_BLOCKER, true).apply()
+        }
+        if (!prefs.contains(BrowserPreferences.KEY_JAVASCRIPT)) {
+            prefs.edit().putBoolean(BrowserPreferences.KEY_JAVASCRIPT, true).apply()
+        }
+        if (!prefs.contains(BrowserPreferences.KEY_DESKTOP_MODE)) {
+            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false).apply()
+        }
+    }
+
+    @Suppress("SetJavaScriptEnabled")
+    private fun applyBrowserSettings(reloadPage: Boolean) {
+        val jsEnabled = prefs.getBoolean(BrowserPreferences.KEY_JAVASCRIPT, true)
+        val desktopMode = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
+        isAdBlockEnabled = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
+
+        webView.settings.javaScriptEnabled = jsEnabled
+        webView.settings.useWideViewPort = desktopMode
+        webView.settings.loadWithOverviewMode = desktopMode
+        webView.settings.userAgentString = if (desktopMode) {
+            DESKTOP_USER_AGENT
+        } else {
+            defaultUserAgent ?: webView.settings.userAgentString
+        }
+
+        if (reloadPage && webView.url != null) {
+            webView.reload()
+        }
+    }
+
     private fun setupUiActions() {
         findViewById<MaterialButton>(R.id.buttonGo).setOnClickListener {
             loadFromInputOrDefault()
@@ -142,7 +205,7 @@ class MainActivity : AppCompatActivity() {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, MENU_HOME, 0, getString(R.string.action_go_home))
         popup.menu.add(0, MENU_CLEAR_CACHE, 1, getString(R.string.action_clear_cache))
-        popup.menu.add(0, MENU_AD_BLOCK, 2, adBlockMenuTitle())
+        popup.menu.add(0, MENU_SETTINGS, 2, getString(R.string.action_settings))
 
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -157,16 +220,8 @@ class MainActivity : AppCompatActivity() {
                     true
                 }
 
-                MENU_AD_BLOCK -> {
-                    isAdBlockEnabled = !isAdBlockEnabled
-                    toast(
-                        if (isAdBlockEnabled) {
-                            getString(R.string.msg_ad_block_enabled)
-                        } else {
-                            getString(R.string.msg_ad_block_disabled)
-                        }
-                    )
-                    webView.reload()
+                MENU_SETTINGS -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
                     true
                 }
 
@@ -174,14 +229,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
         popup.show()
-    }
-
-    private fun adBlockMenuTitle(): String {
-        return if (isAdBlockEnabled) {
-            getString(R.string.action_ad_block_on)
-        } else {
-            getString(R.string.action_ad_block_off)
-        }
     }
 
     private fun loadFromInputOrDefault(fallbackUrl: String = "https://example.com") {
@@ -219,7 +266,9 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val MENU_HOME = 1
         private const val MENU_CLEAR_CACHE = 2
-        private const val MENU_AD_BLOCK = 3
+        private const val MENU_SETTINGS = 3
         private val VIDEO_EXTENSIONS = listOf(".mp4", ".m3u8", ".webm")
+        private const val DESKTOP_USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     }
 }
