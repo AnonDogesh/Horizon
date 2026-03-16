@@ -104,7 +104,14 @@ class MainActivity : AppCompatActivity() {
             "https://www.google.com/search?q=${Uri.encode(raw)}"
         }
 
-        openUrl(resolved)
+        if (resolved.startsWith("https://www.google.com/search")) {
+            startActivity(
+                Intent(this, BrowserTabActivity::class.java)
+                    .putExtra(BrowserTabActivity.EXTRA_QUERY, raw)
+            )
+        } else {
+            openUrl(resolved)
+        }
     }
 
     private fun openUrl(url: String) {
@@ -119,7 +126,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        startActivity(
+            Intent(this, BrowserTabActivity::class.java)
+                .putExtra(BrowserTabActivity.EXTRA_URL, url)
+        )
     }
 
     private fun showQuickMenu(anchor: View) {

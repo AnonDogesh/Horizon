@@ -12,6 +12,9 @@
             android:name=".VaultActivity"
             android:exported="false" />
         <activity
+            android:name=".BrowserTabActivity"
+            android:exported="false" />
+        <activity
             android:name=".SettingsActivity"
             android:exported="false" />
         <activity

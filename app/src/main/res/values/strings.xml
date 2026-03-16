@@ -26,6 +26,10 @@
     <string name="action_add">Add</string>
     <string name="action_customize_feed">Customize Feed</string>
     <string name="action_clear_history">Clear history</string>
+    <string name="action_voice">Voice</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_new_tab">New tab</string>
+    <string name="msg_voice_not_ready">Voice search is coming soon</string>
 
     <string name="setting_ad_blocker">Ad blocker</string>
     <string name="setting_javascript">JavaScript enabled</string>
