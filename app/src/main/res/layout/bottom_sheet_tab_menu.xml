@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#12180F"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <View
+        android:layout_width="48dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="#4E5A46" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/menuPrivateVault"
+        style="@style/Widget.Material3.Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="@string/action_private_vault" />
+
+    <TextView
+        android:id="@+id/rowNewTab"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:padding="10dp"
+        android:text="@string/action_new_tab"
+        android:textColor="#E5E9D7"
+        android:textSize="26sp" />
+
+    <TextView
+        android:id="@+id/rowBookmarks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:padding="10dp"
+        android:text="@string/action_bookmarks"
+        android:textColor="#E5E9D7"
+        android:textSize="26sp" />
+
+    <TextView
+        android:id="@+id/rowHistory"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:padding="10dp"
+        android:text="@string/nav_history"
+        android:textColor="#E5E9D7"
+        android:textSize="26sp" />
+
+    <TextView
+        android:id="@+id/rowDownloads"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:padding="10dp"
+        android:text="@string/action_downloads"
+        android:textColor="#E5E9D7"
+        android:textSize="26sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="10dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/action_desktop_site"
+            android:textColor="#E5E9D7"
+            android:textSize="26sp" />
+
+        <com.google.android.material.switchmaterial.SwitchMaterial
+            android:id="@+id/switchDesktopSite"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+</LinearLayout>

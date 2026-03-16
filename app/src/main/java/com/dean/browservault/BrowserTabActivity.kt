@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.provider.Settings
 import android.view.View
 import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
@@ -17,9 +18,11 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.PopupMenu
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
 import java.util.Locale
 
@@ -125,6 +128,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
                     currentHost.text = Uri.parse(url).host ?: getString(R.string.app_name)
+                    rememberHistory(url)
                 }
             }
         }
@@ -193,23 +197,102 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         findViewById<ImageButton>(R.id.bottomTabs).setOnClickListener {
             toast(getString(R.string.msg_tabs_placeholder))
         }
-        findViewById<ImageButton>(R.id.bottomMenu).setOnClickListener { view ->
-            val popup = PopupMenu(this, view)
-            popup.menu.add(getString(R.string.action_settings))
-            popup.menu.add(getString(R.string.action_vault))
-            popup.setOnMenuItemClickListener {
-                when (it.title.toString()) {
-                    getString(R.string.action_settings) -> {
-                        startActivity(Intent(this, SettingsActivity::class.java)); true
-                    }
-                    getString(R.string.action_vault) -> {
-                        startActivity(Intent(this, VaultActivity::class.java)); true
-                    }
-                    else -> false
-                }
-            }
-            popup.show()
+        findViewById<ImageButton>(R.id.bottomMenu).setOnClickListener {
+            showBottomMenuSheet()
         }
+    }
+
+    private fun showBottomMenuSheet() {
+        val dialog = BottomSheetDialog(this)
+        val content = layoutInflater.inflate(R.layout.bottom_sheet_tab_menu, null)
+        dialog.setContentView(content)
+
+        content.findViewById<MaterialButton>(R.id.menuPrivateVault).setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, VaultActivity::class.java))
+        }
+        content.findViewById<View>(R.id.rowNewTab).setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, MainActivity::class.java))
+        }
+        content.findViewById<View>(R.id.rowBookmarks).setOnClickListener {
+            dialog.dismiss()
+            addCurrentPageToBookmarks()
+            showBookmarksDialog()
+        }
+        content.findViewById<View>(R.id.rowHistory).setOnClickListener {
+            dialog.dismiss()
+            showHistoryDialog()
+        }
+        content.findViewById<View>(R.id.rowDownloads).setOnClickListener {
+            dialog.dismiss()
+            runCatching {
+                startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
+            }.onFailure {
+                toast(getString(R.string.msg_downloads_not_available))
+            }
+        }
+
+        val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
+        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
+        desktopSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
+        }
+
+        dialog.show()
+    }
+
+    private fun addCurrentPageToBookmarks() {
+        val url = webView.url ?: return
+        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
+        val list = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toMutableList()
+        list.remove(url)
+        list.add(0, url)
+        prefs.edit().putStringSet(KEY_BOOKMARKS, list.take(MAX_BOOKMARKS).toSet()).apply()
+        toast(getString(R.string.msg_bookmark_saved))
+    }
+
+    private fun showBookmarksDialog() {
+        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
+        val entries = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toList().sortedDescending()
+        if (entries.isEmpty()) {
+            toast(getString(R.string.msg_no_bookmarks))
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.action_bookmarks)
+            .setItems(entries.toTypedArray()) { _, which ->
+                loadUrlOrVideo(entries[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun rememberHistory(url: String) {
+        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
+        val existing = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toMutableList()
+        existing.remove(url)
+        existing.add(0, url)
+        prefs.edit().putStringSet(KEY_HISTORY, existing.take(MAX_HISTORY).toSet()).apply()
+    }
+
+    private fun showHistoryDialog() {
+        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
+        val entries = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toList().sortedDescending()
+
+        if (entries.isEmpty()) {
+            toast(getString(R.string.msg_no_history))
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.nav_history)
+            .setItems(entries.toTypedArray()) { _, which ->
+                loadUrlOrVideo(entries[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun currentQuery(): String {
@@ -278,6 +361,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     companion object {
         const val EXTRA_QUERY = "extra_query"
         const val EXTRA_URL = "extra_url"
+
+        private const val HISTORY_PREFS = "home_history"
+        private const val KEY_HISTORY = "history_list"
+        private const val MAX_HISTORY = 50
+
+        private const val BOOKMARK_PREFS = "bookmarks"
+        private const val KEY_BOOKMARKS = "bookmark_list"
+        private const val MAX_BOOKMARKS = 50
 
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"

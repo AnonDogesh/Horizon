@@ -30,6 +30,13 @@
     <string name="action_clear">Clear</string>
     <string name="action_new_tab">New tab</string>
     <string name="msg_voice_not_ready">Voice search is coming soon</string>
+    <string name="action_private_vault">Private Vault</string>
+    <string name="action_bookmarks">Bookmarks</string>
+    <string name="action_downloads">Downloads</string>
+    <string name="action_desktop_site">Desktop Site</string>
+    <string name="msg_bookmark_saved">Saved to bookmarks</string>
+    <string name="msg_no_bookmarks">No bookmarks yet</string>
+    <string name="msg_downloads_not_available">Downloads page is not available on this device</string>
 
     <string name="setting_ad_blocker">Ad blocker</string>
     <string name="setting_javascript">JavaScript enabled</string>
