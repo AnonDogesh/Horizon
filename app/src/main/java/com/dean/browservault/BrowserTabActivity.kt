@@ -3,25 +3,28 @@ package com.dean.browservault
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
-import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.TextView
+import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.button.MaterialButton
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
 import java.util.Locale
@@ -30,12 +33,17 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private lateinit var webView: WebView
     private lateinit var searchInput: EditText
-    private lateinit var currentHost: TextView
+    private lateinit var buttonReload: ImageButton
+    private lateinit var engineSpinner: Spinner
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
 
     private val adBlocker = AdBlocker()
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
+    private var isPageLoading = false
+    private var hasRegisteredTabSession = false
+    private val promptedHosts = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,13 +53,17 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
         webView = findViewById(R.id.webView)
         searchInput = findViewById(R.id.searchInput)
-        currentHost = findViewById(R.id.currentHost)
+        buttonReload = findViewById(R.id.buttonReload)
+        engineSpinner = findViewById(R.id.spinnerSearchEngineBrowser)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
 
+        setupSearchEngineSpinner()
         configureWebView()
         applyBrowserSettings(reloadPage = false)
         setupTopBar()
-        setupCategoryBar()
         setupBottomBar()
+        setupBackNavigation()
+        setupSwipeRefresh()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
@@ -85,11 +97,32 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
+    private fun setupSearchEngineSpinner() {
+        val engineNames = SearchEngineManager.engines.values.toList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        engineSpinner.adapter = adapter
+
+        val selectedEngine = SearchEngineManager.selectedEngine(this)
+        val selectedIndex = SearchEngineManager.engines.keys.indexOf(selectedEngine).coerceAtLeast(0)
+        engineSpinner.setSelection(selectedIndex, false)
+
+        engineSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val key = SearchEngineManager.engines.keys.elementAt(position)
+                SearchEngineManager.saveSelectedEngine(this@BrowserTabActivity, key)
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+        }
+    }
+
     @Suppress("SetJavaScriptEnabled")
     private fun configureWebView() {
         webView.setBackgroundColor(Color.parseColor("#0E110C"))
         webView.settings.apply {
             defaultUserAgent = userAgentString
+            javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = true
@@ -123,42 +156,50 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 return false
             }
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                isPageLoading = true
+                updateReloadButton()
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                isPageLoading = false
+                swipeRefresh.isRefreshing = false
+                updateReloadButton()
+
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
-                    currentHost.text = Uri.parse(url).host ?: getString(R.string.app_name)
                     rememberHistory(url)
+                    if (!hasRegisteredTabSession) {
+                        TabSessionStore.add(this@BrowserTabActivity, url)
+                        hasRegisteredTabSession = true
+                    }
+                    maybeHandleCredentialPrompt(url)
                 }
             }
         }
     }
 
     private fun setupTopBar() {
-        findViewById<ImageButton>(R.id.buttonHome).setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
+        buttonReload.setOnClickListener {
+            if (isPageLoading) {
+                webView.stopLoading()
+                isPageLoading = false
+                swipeRefresh.isRefreshing = false
+                updateReloadButton()
+            } else {
+                webView.reload()
+            }
         }
 
-        findViewById<ImageButton>(R.id.buttonReload).setOnClickListener {
-            webView.reload()
-        }
-
-        findViewById<MaterialButton>(R.id.buttonSearch).setOnClickListener {
+        findViewById<ImageButton>(R.id.buttonSearch).setOnClickListener {
             val value = searchInput.text.toString().trim()
             if (value.isBlank()) {
                 toast(getString(R.string.msg_enter_search))
             } else {
-                if (looksLikeUrl(value)) {
-                    loadUrlOrVideo(normalizeUrl(value))
-                } else {
-                    performSearch(value)
-                }
+                loadUrlOrVideo(SearchEngineManager.resolveInputToUrl(this, value))
             }
-        }
-
-        findViewById<ImageButton>(R.id.buttonVoice).setOnClickListener {
-            toast(getString(R.string.msg_voice_not_ready))
         }
 
         findViewById<ImageButton>(R.id.buttonClearSearch).setOnClickListener {
@@ -166,21 +207,94 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
-    private fun setupCategoryBar() {
-        findViewById<MaterialButton>(R.id.filterAll).setOnClickListener {
-            performSearch(currentQuery())
+    private fun setupSwipeRefresh() {
+        swipeRefresh.setColorSchemeColors(Color.parseColor("#B8C58A"))
+        swipeRefresh.setOnRefreshListener {
+            webView.reload()
         }
-        findViewById<MaterialButton>(R.id.filterImages).setOnClickListener {
-            performSearch(currentQuery(), "isch")
+    }
+
+    private fun maybeHandleCredentialPrompt(url: String) {
+        val host = Uri.parse(url).host ?: return
+        if (!looksLikeAuthPage(url)) return
+
+        if (!promptedHosts.add(host)) return
+
+        val existing = CredentialStore.get(this, host)
+        if (existing != null) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.title_use_saved_credentials)
+                .setMessage(getString(R.string.msg_use_saved_credentials, host))
+                .setPositiveButton(R.string.action_use) { _, _ -> autofillCredentials(existing) }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
         }
-        findViewById<MaterialButton>(R.id.filterVideos).setOnClickListener {
-            performSearch(currentQuery(), "vid")
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_save_credentials)
+            .setMessage(getString(R.string.msg_save_credentials_for, host))
+            .setPositiveButton(R.string.action_save) { _, _ -> showSaveCredentialDialog(host) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSaveCredentialDialog(host: String) {
+        val usernameInput = EditText(this).apply { hint = getString(R.string.hint_username) }
+        val passwordInput = EditText(this).apply {
+            hint = getString(R.string.hint_password)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
-        findViewById<MaterialButton>(R.id.filterNews).setOnClickListener {
-            performSearch(currentQuery(), "nws")
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 0)
+            addView(usernameInput)
+            addView(passwordInput)
         }
-        findViewById<MaterialButton>(R.id.filterShopping).setOnClickListener {
-            performSearch(currentQuery(), "shop")
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_save_credentials)
+            .setView(container)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val user = usernameInput.text.toString().trim()
+                val pass = passwordInput.text.toString().trim()
+                if (user.isNotEmpty() && pass.isNotEmpty()) {
+                    CredentialStore.save(this, host, user, pass)
+                    toast(getString(R.string.msg_credentials_saved))
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun autofillCredentials(credential: SavedCredential) {
+        val safeUser = credential.username.replace("'", "\\'")
+        val safePass = credential.password.replace("'", "\\'")
+        webView.evaluateJavascript(
+            """
+            (function(){
+              var user = document.querySelector('input[type=email], input[name*=user], input[name*=email], input[type=text]');
+              var pass = document.querySelector('input[type=password]');
+              if(user){user.value='$safeUser';}
+              if(pass){pass.value='$safePass';}
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    private fun looksLikeAuthPage(url: String): Boolean {
+        val lower = url.lowercase(Locale.US)
+        return lower.contains("login") || lower.contains("signin") || lower.contains("signup") || lower.contains("register")
+    }
+
+    private fun updateReloadButton() {
+        if (isPageLoading) {
+            buttonReload.setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            buttonReload.contentDescription = getString(R.string.action_stop_loading)
+        } else {
+            buttonReload.setImageResource(android.R.drawable.ic_popup_sync)
+            buttonReload.contentDescription = getString(R.string.action_refresh)
         }
     }
 
@@ -195,11 +309,24 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             startActivity(Intent(this, MainActivity::class.java))
         }
         findViewById<ImageButton>(R.id.bottomTabs).setOnClickListener {
-            toast(getString(R.string.msg_tabs_placeholder))
+            startActivity(Intent(this, TabManagerActivity::class.java))
         }
         findViewById<ImageButton>(R.id.bottomMenu).setOnClickListener {
             showBottomMenuSheet()
         }
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
     private fun showBottomMenuSheet() {
@@ -217,8 +344,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
-            addCurrentPageToBookmarks()
             showBookmarksDialog()
+        }
+        content.findViewById<View>(R.id.rowAddBookmark).apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                dialog.dismiss()
+                addCurrentPageToBookmarks()
+            }
         }
         content.findViewById<View>(R.id.rowHistory).setOnClickListener {
             dialog.dismiss()
@@ -226,11 +359,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
-            runCatching {
-                startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
-            }.onFailure {
-                toast(getString(R.string.msg_downloads_not_available))
-            }
+            startActivity(Intent(this, DownloadsActivity::class.java))
         }
 
         val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
@@ -295,18 +424,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             .show()
     }
 
-    private fun currentQuery(): String {
-        val current = searchInput.text.toString().trim()
-        return if (current.isBlank()) "horizon browser" else current
-    }
-
-    private fun performSearch(query: String, tbm: String? = null) {
-        val encoded = Uri.encode(query)
-        val url = if (tbm == null) {
-            "https://www.google.com/search?q=$encoded"
-        } else {
-            "https://www.google.com/search?q=$encoded&tbm=$tbm"
-        }
+    private fun performSearch(query: String) {
+        val selectedEngine = SearchEngineManager.selectedEngine(this)
+        val url = SearchEngineManager.buildSearchUrl(selectedEngine, query)
         webView.loadUrl(url)
     }
 
@@ -321,14 +441,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
-    private fun looksLikeUrl(value: String): Boolean {
-        return URLUtil.isValidUrl(value) || (value.contains(".") && !value.contains(" "))
-    }
-
-    private fun normalizeUrl(value: String): String {
-        return if (value.startsWith("http://") || value.startsWith("https://")) value else "https://$value"
-    }
-
     private fun isVideoUrl(url: String): Boolean {
         val lower = url.lowercase(Locale.US)
         return lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")
@@ -341,6 +453,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         isAdBlockEnabled = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
 
         webView.settings.javaScriptEnabled = jsEnabled
+        webView.settings.domStorageEnabled = true
         webView.settings.useWideViewPort = desktopMode
         webView.settings.loadWithOverviewMode = desktopMode
         webView.settings.userAgentString = if (desktopMode) {

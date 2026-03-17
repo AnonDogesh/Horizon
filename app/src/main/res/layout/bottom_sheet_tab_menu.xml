@@ -41,6 +41,17 @@
         android:textSize="26sp" />
 
     <TextView
+        android:id="@+id/rowAddBookmark"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:padding="10dp"
+        android:text="@string/action_add_bookmark"
+        android:textColor="#E5E9D7"
+        android:textSize="26sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/rowHistory"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

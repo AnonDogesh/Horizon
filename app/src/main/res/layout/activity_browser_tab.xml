@@ -5,55 +5,19 @@
     android:layout_height="match_parent"
     android:background="#0E110C"
     android:orientation="vertical"
-    android:paddingStart="14dp"
-    android:paddingTop="14dp"
-    android:paddingEnd="14dp">
+    android:paddingTop="10dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
         android:background="#171D15"
         android:gravity="center_vertical"
+        android:minHeight="44dp"
         android:orientation="horizontal"
-        android:padding="10dp">
-
-        <ImageButton
-            android:id="@+id/buttonHome"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/nav_home"
-            android:src="@android:drawable/ic_menu_view"
-            app:tint="#C7D0A5" />
-
-        <TextView
-            android:id="@+id/currentHost"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
-            android:text="google.com"
-            android:textColor="#E6ECD7"
-            android:textSize="18sp" />
-
-        <ImageButton
-            android:id="@+id/buttonReload"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_refresh"
-            android:src="@android:drawable/ic_popup_sync"
-            app:tint="#C7D0A5" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:background="#2A3126"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="8dp">
+        android:paddingStart="6dp"
+        android:paddingEnd="6dp">
 
         <EditText
             android:id="@+id/searchInput"
@@ -64,90 +28,63 @@
             android:hint="@string/hint_search"
             android:imeOptions="actionSearch"
             android:inputType="text"
-            android:paddingStart="8dp"
+            android:maxLines="1"
+            android:padding="0dp"
             android:textColor="#E6ECD7"
-            android:textColorHint="#8E9980" />
-
-        <ImageButton
-            android:id="@+id/buttonVoice"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_voice"
-            android:src="@android:drawable/ic_btn_speak_now"
-            app:tint="#C7D0A5" />
+            android:textColorHint="#8E9980"
+            android:textSize="14sp" />
 
         <ImageButton
             android:id="@+id/buttonClearSearch"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
             android:background="@android:color/transparent"
             android:contentDescription="@string/action_clear"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             app:tint="#C7D0A5" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonSearch"
-            style="@style/Widget.Material3.Button"
+        <Spinner
+            android:id="@+id/spinnerSearchEngineBrowser"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/action_search" />
+            android:layout_marginStart="4dp"
+            android:background="#171D15"
+            android:minWidth="72dp"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp" />
+
+        <ImageButton
+            android:id="@+id/buttonReload"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/action_refresh"
+            android:src="@android:drawable/ic_popup_sync"
+            app:tint="#C7D0A5" />
+
+        <ImageButton
+            android:id="@+id/buttonSearch"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginStart="4dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/action_search"
+            android:src="@android:drawable/ic_menu_search"
+            app:tint="#C7D0A5" />
     </LinearLayout>
 
-    <HorizontalScrollView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:scrollbars="none">
-
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/filterAll"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="All" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/filterImages"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Images" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/filterVideos"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Videos" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/filterNews"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="News" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/filterShopping"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Shopping" />
-        </LinearLayout>
-    </HorizontalScrollView>
-
-    <WebView
-        android:id="@+id/webView"
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="6dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
+
+        <WebView
+            android:id="@+id/webView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <LinearLayout
         android:layout_width="match_parent"

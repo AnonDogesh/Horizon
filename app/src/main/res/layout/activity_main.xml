@@ -32,12 +32,12 @@
                 android:textStyle="bold" />
 
             <ImageButton
-                android:id="@+id/buttonProfile"
+                android:id="@+id/buttonSettings"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
                 android:background="@android:color/transparent"
-                android:contentDescription="@string/action_profile"
-                android:src="@android:drawable/ic_menu_myplaces"
+                android:contentDescription="@string/action_settings"
+                android:src="@android:drawable/ic_menu_manage"
                 app:tint="#D8E2BE" />
         </LinearLayout>
 
@@ -74,11 +74,21 @@
                 android:textColor="#DCE5C8"
                 android:textColorHint="#758266" />
 
+            <Spinner
+                android:id="@+id/spinnerSearchEngineHome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="#2A3126"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonSearch"
                 style="@style/Widget.Material3.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:text="@string/action_search" />
         </LinearLayout>
 
@@ -87,53 +97,115 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:gravity="center"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonMail"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="@string/action_mail" />
+                android:gravity="spaceEvenly"
+                android:orientation="horizontal">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonDaily"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="6dp"
-                android:layout_weight="1"
-                android:text="@string/action_daily" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonMarket"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginHorizontal="6dp"
-                android:layout_weight="1"
-                android:text="@string/action_market" />
+                    <ImageButton
+                        android:id="@+id/shortcutChatGpt"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="#1B2218"
+                        android:contentDescription="ChatGPT"
+                        android:padding="12dp"
+                        android:src="@android:drawable/ic_menu_info_details"
+                        android:tint="#D8E2BE" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/buttonCloud"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="@string/action_cloud" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="ChatGPT"
+                        android:textColor="#C7D0A5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageButton
+                        android:id="@+id/shortcutYoutube"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="#1B2218"
+                        android:contentDescription="YouTube"
+                        android:padding="12dp"
+                        android:src="@android:drawable/ic_media_play"
+                        android:tint="#D8E2BE" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="YouTube"
+                        android:textColor="#C7D0A5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageButton
+                        android:id="@+id/shortcutX"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="#1B2218"
+                        android:contentDescription="X"
+                        android:padding="12dp"
+                        android:src="@android:drawable/ic_menu_share"
+                        android:tint="#D8E2BE" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="X"
+                        android:textColor="#C7D0A5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical">
+
+                    <ImageButton
+                        android:id="@+id/shortcutInstagram"
+                        android:layout_width="58dp"
+                        android:layout_height="58dp"
+                        android:background="#1B2218"
+                        android:contentDescription="Instagram"
+                        android:padding="12dp"
+                        android:src="@android:drawable/ic_menu_camera"
+                        android:tint="#D8E2BE" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="Instagram"
+                        android:textColor="#C7D0A5"
+                        android:textSize="12sp" />
+                </LinearLayout>
+            </LinearLayout>
         </LinearLayout>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/buttonAdd"
-            style="@style/Widget.Material3.Button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="12dp"
-            android:text="@string/action_add" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -258,13 +330,13 @@
             android:text="@string/nav_history" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/navSettings"
+            android:id="@+id/navTabs"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="4dp"
             android:layout_weight="1"
-            android:text="@string/nav_settings" />
+            android:text="@string/action_tabs" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/navMenu"
