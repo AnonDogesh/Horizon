@@ -129,6 +129,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                     searchInput.setText(url)
                     currentHost.text = Uri.parse(url).host ?: getString(R.string.app_name)
                     rememberHistory(url)
+                    TabSessionStore.add(this@BrowserTabActivity, url)
                 }
             }
         }

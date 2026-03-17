@@ -52,27 +52,14 @@ class TabManagerActivity : AppCompatActivity() {
     }
 
     private fun loadTabs() {
-        val urls = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-            .getStringSet(KEY_HISTORY, emptySet())
-            .orEmpty()
-            .toList()
-            .sortedByDescending { it }
-            .take(MAX_TABS)
+        val urls = TabSessionStore.list(this)
 
         tabAdapter.submitTabs(urls)
         tabCountText.text = resources.getQuantityString(R.plurals.tab_manager_tabs_open, urls.size, urls.size)
     }
 
     private fun removeTab(url: String) {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toMutableSet()
-        entries.remove(url)
-        prefs.edit().putStringSet(KEY_HISTORY, entries).apply()
+        TabSessionStore.remove(this, url)
     }
 
-    companion object {
-        private const val HISTORY_PREFS = "home_history"
-        private const val KEY_HISTORY = "history_list"
-        private const val MAX_TABS = 20
-    }
 }

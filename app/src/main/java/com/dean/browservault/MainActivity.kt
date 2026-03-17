@@ -3,16 +3,17 @@ package com.dean.browservault
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
+import android.provider.Settings
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.PopupMenu
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -35,8 +36,8 @@ class MainActivity : AppCompatActivity() {
             searchFromInput()
         }
 
-        findViewById<ImageButton>(R.id.buttonProfile).setOnClickListener { view ->
-            showQuickMenu(view)
+        findViewById<ImageButton>(R.id.buttonSettings).setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         findViewById<TextView>(R.id.textCustomize).setOnClickListener {
@@ -81,11 +82,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.navHistory).setOnClickListener {
             showHistoryDialog()
         }
-        findViewById<MaterialButton>(R.id.navSettings).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+        findViewById<MaterialButton>(R.id.navTabs).setOnClickListener {
+            startActivity(Intent(this, TabManagerActivity::class.java))
         }
-        findViewById<MaterialButton>(R.id.navMenu).setOnClickListener { view ->
-            showQuickMenu(view)
+        findViewById<MaterialButton>(R.id.navMenu).setOnClickListener {
+            showBottomMenuSheet()
         }
     }
 
@@ -116,6 +117,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openUrl(url: String) {
         rememberHistory(url)
+        TabSessionStore.add(this, url)
 
         val lower = url.lowercase(Locale.US)
         if (lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")) {
@@ -132,33 +134,61 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun showQuickMenu(anchor: View) {
-        val popup = PopupMenu(this, anchor)
-        popup.menu.add(0, MENU_VAULT, 0, getString(R.string.action_vault))
-        popup.menu.add(0, MENU_SETTINGS, 1, getString(R.string.action_settings))
-        popup.menu.add(0, MENU_CLEAR_HISTORY, 2, getString(R.string.action_clear_history))
-        popup.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                MENU_VAULT -> {
-                    startActivity(Intent(this, VaultActivity::class.java))
-                    true
-                }
+    private fun showBottomMenuSheet() {
+        val prefs = getSharedPreferences(BrowserPreferences.PREFS_NAME, MODE_PRIVATE)
 
-                MENU_SETTINGS -> {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                    true
-                }
+        val dialog = BottomSheetDialog(this)
+        val content = layoutInflater.inflate(R.layout.bottom_sheet_tab_menu, null)
+        dialog.setContentView(content)
 
-                MENU_CLEAR_HISTORY -> {
-                    clearHistory()
-                    toast(getString(R.string.msg_history_cleared))
-                    true
-                }
-
-                else -> false
+        content.findViewById<MaterialButton>(R.id.menuPrivateVault).setOnClickListener {
+            dialog.dismiss()
+            startActivity(Intent(this, VaultActivity::class.java))
+        }
+        content.findViewById<android.view.View>(R.id.rowNewTab).setOnClickListener {
+            dialog.dismiss()
+        }
+        content.findViewById<android.view.View>(R.id.rowBookmarks).setOnClickListener {
+            dialog.dismiss()
+            showBookmarksDialog()
+        }
+        content.findViewById<android.view.View>(R.id.rowHistory).setOnClickListener {
+            dialog.dismiss()
+            showHistoryDialog()
+        }
+        content.findViewById<android.view.View>(R.id.rowDownloads).setOnClickListener {
+            dialog.dismiss()
+            runCatching {
+                startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
+            }.onFailure {
+                toast(getString(R.string.msg_downloads_not_available))
             }
         }
-        popup.show()
+
+        val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
+        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
+        desktopSwitch.setOnCheckedChangeListener { _, checked ->
+            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
+        }
+
+        dialog.show()
+    }
+
+    private fun showBookmarksDialog() {
+        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
+        val entries = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toList().sortedDescending()
+        if (entries.isEmpty()) {
+            toast(getString(R.string.msg_no_bookmarks))
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.action_bookmarks)
+            .setItems(entries.toTypedArray()) { _, which ->
+                openUrl(entries[which])
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun rememberHistory(url: String) {
@@ -188,20 +218,16 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun clearHistory() {
-        getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE).edit().remove(KEY_HISTORY).apply()
-    }
-
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     companion object {
-        private const val MENU_VAULT = 1
-        private const val MENU_SETTINGS = 2
-        private const val MENU_CLEAR_HISTORY = 3
         private const val HISTORY_PREFS = "home_history"
         private const val KEY_HISTORY = "history_list"
         private const val MAX_HISTORY = 20
+
+        private const val BOOKMARK_PREFS = "bookmarks"
+        private const val KEY_BOOKMARKS = "bookmark_list"
     }
 }

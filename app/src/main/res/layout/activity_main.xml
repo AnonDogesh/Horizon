@@ -32,12 +32,12 @@
                 android:textStyle="bold" />
 
             <ImageButton
-                android:id="@+id/buttonProfile"
+                android:id="@+id/buttonSettings"
                 android:layout_width="42dp"
                 android:layout_height="42dp"
                 android:background="@android:color/transparent"
-                android:contentDescription="@string/action_profile"
-                android:src="@android:drawable/ic_menu_myplaces"
+                android:contentDescription="@string/action_settings"
+                android:src="@android:drawable/ic_menu_manage"
                 app:tint="#D8E2BE" />
         </LinearLayout>
 
@@ -258,13 +258,13 @@
             android:text="@string/nav_history" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/navSettings"
+            android:id="@+id/navTabs"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="4dp"
             android:layout_weight="1"
-            android:text="@string/nav_settings" />
+            android:text="@string/action_tabs" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/navMenu"
