@@ -40,6 +40,26 @@
     <string name="msg_vault_search_coming_soon">Vault search is coming soon</string>
     <string name="action_bookmarks">Bookmarks</string>
     <string name="action_downloads">Downloads</string>
+    <string name="action_more">More actions</string>
+    <string name="action_move_to_vault">Move to vault</string>
+    <string name="msg_no_downloads">No downloads found.</string>
+
+    <plurals name="downloads_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="msg_move_files_confirm">
+        <item quantity="one">Move %d file to vault?</item>
+        <item quantity="other">Move %d files to vault?</item>
+    </plurals>
+    <plurals name="msg_delete_files_confirm">
+        <item quantity="one">Delete %d file?</item>
+        <item quantity="other">Delete %d files?</item>
+    </plurals>
+    <plurals name="msg_files_moved">
+        <item quantity="one">Moved %d file to vault</item>
+        <item quantity="other">Moved %d files to vault</item>
+    </plurals>
     <string name="action_desktop_site">Desktop Site</string>
     <string name="msg_bookmark_saved">Saved to bookmarks</string>
     <string name="msg_no_bookmarks">No bookmarks yet</string>

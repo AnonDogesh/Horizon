@@ -7,7 +7,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -42,6 +41,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
     private var isPageLoading = false
+    private var hasRegisteredTabSession = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +59,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         configureWebView()
         applyBrowserSettings(reloadPage = false)
         setupTopBar()
-        setupCategoryBar()
         setupBottomBar()
         setupBackNavigation()
         setupSwipeRefresh()
@@ -170,7 +169,10 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
                     rememberHistory(url)
-                    TabSessionStore.add(this@BrowserTabActivity, url)
+                    if (!hasRegisteredTabSession) {
+                        TabSessionStore.add(this@BrowserTabActivity, url)
+                        hasRegisteredTabSession = true
+                    }
                 }
             }
         }
@@ -221,24 +223,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         } else {
             buttonReload.setImageResource(android.R.drawable.ic_popup_sync)
             buttonReload.contentDescription = getString(R.string.action_refresh)
-        }
-    }
-
-    private fun setupCategoryBar() {
-        findViewById<MaterialButton>(R.id.filterAll).setOnClickListener {
-            performSearch(currentQuery())
-        }
-        findViewById<MaterialButton>(R.id.filterImages).setOnClickListener {
-            performSearch(currentQuery(), "isch")
-        }
-        findViewById<MaterialButton>(R.id.filterVideos).setOnClickListener {
-            performSearch(currentQuery(), "vid")
-        }
-        findViewById<MaterialButton>(R.id.filterNews).setOnClickListener {
-            performSearch(currentQuery(), "nws")
-        }
-        findViewById<MaterialButton>(R.id.filterShopping).setOnClickListener {
-            performSearch(currentQuery(), "shop")
         }
     }
 
@@ -297,11 +281,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
-            runCatching {
-                startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
-            }.onFailure {
-                toast(getString(R.string.msg_downloads_not_available))
-            }
+            startActivity(Intent(this, DownloadsActivity::class.java))
         }
 
         val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
@@ -366,14 +346,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             .show()
     }
 
-    private fun currentQuery(): String {
-        val current = searchInput.text.toString().trim()
-        return if (current.isBlank()) "horizon browser" else current
-    }
-
-    private fun performSearch(query: String, tbm: String? = null) {
+    private fun performSearch(query: String) {
         val selectedEngine = SearchEngineManager.selectedEngine(this)
-        val url = SearchEngineManager.buildSearchUrl(selectedEngine, query, tbm)
+        val url = SearchEngineManager.buildSearchUrl(selectedEngine, query)
         webView.loadUrl(url)
     }
 

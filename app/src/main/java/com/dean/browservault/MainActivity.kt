@@ -2,7 +2,6 @@ package com.dean.browservault
 
 import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
@@ -168,11 +167,7 @@ class MainActivity : AppCompatActivity() {
         }
         content.findViewById<android.view.View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
-            runCatching {
-                startActivity(Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS))
-            }.onFailure {
-                toast(getString(R.string.msg_downloads_not_available))
-            }
+            startActivity(Intent(this, DownloadsActivity::class.java))
         }
 
         val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
