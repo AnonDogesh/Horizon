@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0E110C"
+    android:paddingStart="14dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="14dp">
+
+    <TextView
+        android:id="@+id/textTabCount"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/tab_manager_title"
+        android:textColor="#E6ECD7"
+        android:textSize="21sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@id/buttonTabSettings"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/buttonTabSettings"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/action_settings"
+        android:src="@android:drawable/ic_menu_manage"
+        android:tint="#B8C58A"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/textDots"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/tab_manager_dots"
+        android:textColor="#6F795D"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toEndOf="@id/textTabCount"
+        app:layout_constraintStart_toStartOf="@id/textTabCount"
+        app:layout_constraintTop_toBottomOf="@id/textTabCount" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/tabsRecyclerView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginTop="14dp"
+        android:clipToPadding="false"
+        android:paddingBottom="28dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textDots" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

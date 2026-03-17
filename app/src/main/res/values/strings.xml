@@ -84,7 +84,6 @@
     <string name="title_delete_file">Delete file?</string>
     <string name="msg_no_back_history">No previous page</string>
     <string name="msg_no_forward_history">No next page</string>
-    <string name="msg_tabs_placeholder">Tabs manager coming soon</string>
     <string name="msg_cache_cleared">Web cache cleared</string>
     <string name="msg_invalid_video_url">Invalid video URL</string>
     <string name="msg_file_added_to_vault">File added to vault</string>
@@ -96,4 +95,12 @@
     <string name="msg_no_history">No browsing history yet</string>
     <string name="msg_history_cleared">History cleared</string>
     <string name="msg_home_active">Home page is already open</string>
+    <string name="tab_manager_title">Tabs</string>
+    <string name="tab_manager_dots">• • • •</string>
+    <string name="action_close_tab">Close tab</string>
+
+    <plurals name="tab_manager_tabs_open">
+        <item quantity="one">%d Tab Open</item>
+        <item quantity="other">%d Tabs Open</item>
+    </plurals>
 </resources>

@@ -195,7 +195,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             startActivity(Intent(this, MainActivity::class.java))
         }
         findViewById<ImageButton>(R.id.bottomTabs).setOnClickListener {
-            toast(getString(R.string.msg_tabs_placeholder))
+            startActivity(Intent(this, TabManagerActivity::class.java))
         }
         findViewById<ImageButton>(R.id.bottomMenu).setOnClickListener {
             showBottomMenuSheet()

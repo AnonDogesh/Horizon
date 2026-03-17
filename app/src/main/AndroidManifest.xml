@@ -9,6 +9,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Horizon">
         <activity
+            android:name=".TabManagerActivity"
+            android:exported="false" />
+        <activity
             android:name=".VaultActivity"
             android:exported="false" />
         <activity
