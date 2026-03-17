@@ -74,11 +74,21 @@
                 android:textColor="#DCE5C8"
                 android:textColorHint="#758266" />
 
+            <Spinner
+                android:id="@+id/spinnerSearchEngineHome"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:background="#2A3126"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buttonSearch"
                 style="@style/Widget.Material3.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
                 android:text="@string/action_search" />
         </LinearLayout>
 

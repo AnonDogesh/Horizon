@@ -1,11 +1,12 @@
 package com.dean.browservault
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -19,16 +20,40 @@ import java.util.Locale
 class MainActivity : AppCompatActivity() {
 
     private lateinit var inputSearch: EditText
+    private lateinit var searchEngineSpinner: Spinner
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         inputSearch = findViewById(R.id.inputSearch)
+        searchEngineSpinner = findViewById(R.id.spinnerSearchEngineHome)
+
+        setupSearchEngineSpinner()
         setupTopActions()
         setupShortcutActions()
         setupFeedActions()
         setupBottomActions()
+    }
+
+    private fun setupSearchEngineSpinner() {
+        val engineNames = SearchEngineManager.engines.values.toList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        searchEngineSpinner.adapter = adapter
+
+        val selectedEngine = SearchEngineManager.selectedEngine(this)
+        val selectedIndex = SearchEngineManager.engines.keys.indexOf(selectedEngine).coerceAtLeast(0)
+        searchEngineSpinner.setSelection(selectedIndex, false)
+
+        searchEngineSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                val key = SearchEngineManager.engines.keys.elementAt(position)
+                SearchEngineManager.saveSelectedEngine(this@MainActivity, key)
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+        }
     }
 
     private fun setupTopActions() {
@@ -96,23 +121,8 @@ class MainActivity : AppCompatActivity() {
             toast(getString(R.string.msg_enter_search))
             return
         }
-
-        val resolved = if (raw.startsWith("http://") || raw.startsWith("https://")) {
-            raw
-        } else if (raw.contains(".") && !raw.contains(" ")) {
-            "https://$raw"
-        } else {
-            "https://www.google.com/search?q=${Uri.encode(raw)}"
-        }
-
-        if (resolved.startsWith("https://www.google.com/search")) {
-            startActivity(
-                Intent(this, BrowserTabActivity::class.java)
-                    .putExtra(BrowserTabActivity.EXTRA_QUERY, raw)
-            )
-        } else {
-            openUrl(resolved)
-        }
+        val resolvedUrl = SearchEngineManager.resolveInputToUrl(this, raw)
+        openUrl(resolvedUrl)
     }
 
     private fun openUrl(url: String) {

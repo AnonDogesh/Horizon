@@ -44,6 +44,16 @@
             android:contentDescription="@string/action_refresh"
             android:src="@android:drawable/ic_popup_sync"
             app:tint="#C7D0A5" />
+
+        <Spinner
+            android:id="@+id/spinnerSearchEngineBrowser"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="#171D15"
+            android:minWidth="72dp"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp" />
     </LinearLayout>
 
     <LinearLayout

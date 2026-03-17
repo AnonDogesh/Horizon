@@ -8,20 +8,22 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
-import android.webkit.URLUtil
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.material.button.MaterialButton
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
 import java.util.Locale
@@ -31,11 +33,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private lateinit var webView: WebView
     private lateinit var searchInput: EditText
     private lateinit var currentHost: TextView
+    private lateinit var buttonReload: ImageButton
+    private lateinit var engineSpinner: Spinner
     private lateinit var prefs: SharedPreferences
 
     private val adBlocker = AdBlocker()
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
+    private var isPageLoading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,12 +51,16 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         webView = findViewById(R.id.webView)
         searchInput = findViewById(R.id.searchInput)
         currentHost = findViewById(R.id.currentHost)
+        buttonReload = findViewById(R.id.buttonReload)
+        engineSpinner = findViewById(R.id.spinnerSearchEngineBrowser)
 
+        setupSearchEngineSpinner()
         configureWebView()
         applyBrowserSettings(reloadPage = false)
         setupTopBar()
         setupCategoryBar()
         setupBottomBar()
+        setupBackNavigation()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
@@ -85,11 +94,32 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
+    private fun setupSearchEngineSpinner() {
+        val engineNames = SearchEngineManager.engines.values.toList()
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, engineNames)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        engineSpinner.adapter = adapter
+
+        val selectedEngine = SearchEngineManager.selectedEngine(this)
+        val selectedIndex = SearchEngineManager.engines.keys.indexOf(selectedEngine).coerceAtLeast(0)
+        engineSpinner.setSelection(selectedIndex, false)
+
+        engineSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val key = SearchEngineManager.engines.keys.elementAt(position)
+                SearchEngineManager.saveSelectedEngine(this@BrowserTabActivity, key)
+            }
+
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+        }
+    }
+
     @Suppress("SetJavaScriptEnabled")
     private fun configureWebView() {
         webView.setBackgroundColor(Color.parseColor("#0E110C"))
         webView.settings.apply {
             defaultUserAgent = userAgentString
+            javaScriptEnabled = true
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = true
@@ -123,8 +153,17 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 return false
             }
 
+            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                isPageLoading = true
+                updateReloadButton()
+            }
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+                isPageLoading = false
+                updateReloadButton()
+
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
                     currentHost.text = Uri.parse(url).host ?: getString(R.string.app_name)
@@ -141,8 +180,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             finish()
         }
 
-        findViewById<ImageButton>(R.id.buttonReload).setOnClickListener {
-            webView.reload()
+        buttonReload.setOnClickListener {
+            if (isPageLoading) {
+                webView.stopLoading()
+                isPageLoading = false
+                updateReloadButton()
+            } else {
+                webView.reload()
+            }
         }
 
         findViewById<MaterialButton>(R.id.buttonSearch).setOnClickListener {
@@ -150,11 +195,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             if (value.isBlank()) {
                 toast(getString(R.string.msg_enter_search))
             } else {
-                if (looksLikeUrl(value)) {
-                    loadUrlOrVideo(normalizeUrl(value))
-                } else {
-                    performSearch(value)
-                }
+                val target = SearchEngineManager.resolveInputToUrl(this, value)
+                loadUrlOrVideo(target)
             }
         }
 
@@ -164,6 +206,16 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
         findViewById<ImageButton>(R.id.buttonClearSearch).setOnClickListener {
             searchInput.setText("")
+        }
+    }
+
+    private fun updateReloadButton() {
+        if (isPageLoading) {
+            buttonReload.setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
+            buttonReload.contentDescription = getString(R.string.action_stop_loading)
+        } else {
+            buttonReload.setImageResource(android.R.drawable.ic_popup_sync)
+            buttonReload.contentDescription = getString(R.string.action_refresh)
         }
     }
 
@@ -201,6 +253,19 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         findViewById<ImageButton>(R.id.bottomMenu).setOnClickListener {
             showBottomMenuSheet()
         }
+    }
+
+    private fun setupBackNavigation() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 
     private fun showBottomMenuSheet() {
@@ -302,12 +367,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun performSearch(query: String, tbm: String? = null) {
-        val encoded = Uri.encode(query)
-        val url = if (tbm == null) {
-            "https://www.google.com/search?q=$encoded"
-        } else {
-            "https://www.google.com/search?q=$encoded&tbm=$tbm"
-        }
+        val selectedEngine = SearchEngineManager.selectedEngine(this)
+        val url = SearchEngineManager.buildSearchUrl(selectedEngine, query, tbm)
         webView.loadUrl(url)
     }
 
@@ -322,14 +383,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
-    private fun looksLikeUrl(value: String): Boolean {
-        return URLUtil.isValidUrl(value) || (value.contains(".") && !value.contains(" "))
-    }
-
-    private fun normalizeUrl(value: String): String {
-        return if (value.startsWith("http://") || value.startsWith("https://")) value else "https://$value"
-    }
-
     private fun isVideoUrl(url: String): Boolean {
         val lower = url.lowercase(Locale.US)
         return lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")
@@ -342,6 +395,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         isAdBlockEnabled = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
 
         webView.settings.javaScriptEnabled = jsEnabled
+        webView.settings.domStorageEnabled = true
         webView.settings.useWideViewPort = desktopMode
         webView.settings.loadWithOverviewMode = desktopMode
         webView.settings.userAgentString = if (desktopMode) {
