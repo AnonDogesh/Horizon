@@ -3,6 +3,7 @@ package com.dean.browservault
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -17,11 +18,11 @@ import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.Spinner
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -32,9 +33,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private lateinit var webView: WebView
     private lateinit var searchInput: EditText
-    private lateinit var currentHost: TextView
     private lateinit var buttonReload: ImageButton
     private lateinit var engineSpinner: Spinner
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var prefs: SharedPreferences
 
     private val adBlocker = AdBlocker()
@@ -50,9 +51,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
         webView = findViewById(R.id.webView)
         searchInput = findViewById(R.id.searchInput)
-        currentHost = findViewById(R.id.currentHost)
         buttonReload = findViewById(R.id.buttonReload)
         engineSpinner = findViewById(R.id.spinnerSearchEngineBrowser)
+        swipeRefresh = findViewById(R.id.swipeRefresh)
 
         setupSearchEngineSpinner()
         configureWebView()
@@ -61,6 +62,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         setupCategoryBar()
         setupBottomBar()
         setupBackNavigation()
+        setupSwipeRefresh()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
@@ -153,7 +155,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 return false
             }
 
-            override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
                 updateReloadButton()
@@ -162,11 +164,11 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 isPageLoading = false
+                swipeRefresh.isRefreshing = false
                 updateReloadButton()
 
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
-                    currentHost.text = Uri.parse(url).host ?: getString(R.string.app_name)
                     rememberHistory(url)
                     TabSessionStore.add(this@BrowserTabActivity, url)
                 }
@@ -184,28 +186,31 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             if (isPageLoading) {
                 webView.stopLoading()
                 isPageLoading = false
+                swipeRefresh.isRefreshing = false
                 updateReloadButton()
             } else {
                 webView.reload()
             }
         }
 
-        findViewById<MaterialButton>(R.id.buttonSearch).setOnClickListener {
+        findViewById<ImageButton>(R.id.buttonSearch).setOnClickListener {
             val value = searchInput.text.toString().trim()
             if (value.isBlank()) {
                 toast(getString(R.string.msg_enter_search))
             } else {
-                val target = SearchEngineManager.resolveInputToUrl(this, value)
-                loadUrlOrVideo(target)
+                loadUrlOrVideo(SearchEngineManager.resolveInputToUrl(this, value))
             }
-        }
-
-        findViewById<ImageButton>(R.id.buttonVoice).setOnClickListener {
-            toast(getString(R.string.msg_voice_not_ready))
         }
 
         findViewById<ImageButton>(R.id.buttonClearSearch).setOnClickListener {
             searchInput.setText("")
+        }
+    }
+
+    private fun setupSwipeRefresh() {
+        swipeRefresh.setColorSchemeColors(Color.parseColor("#B8C58A"))
+        swipeRefresh.setOnRefreshListener {
+            webView.reload()
         }
     }
 

@@ -35,7 +35,6 @@
     <string name="vault_subtitle">HORIZON SECURE</string>
     <string name="vault_tab_images">Images</string>
     <string name="vault_tab_videos">Videos</string>
-    <string name="vault_tab_documents">Documents</string>
     <string name="vault_empty_state">No files in this section yet.</string>
     <string name="vault_video_content">Video item</string>
     <string name="msg_vault_search_coming_soon">Vault search is coming soon</string>

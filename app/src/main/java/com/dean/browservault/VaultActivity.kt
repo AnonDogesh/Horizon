@@ -48,7 +48,7 @@ class VaultActivity : AppCompatActivity() {
         setupTabs()
 
         findViewById<FloatingActionButton>(R.id.buttonAddFile).setOnClickListener {
-            pickFileLauncher.launch(arrayOf("*/*"))
+            pickFileLauncher.launch(arrayOf("image/*", "video/*"))
         }
 
         loadVaultFiles()
@@ -70,13 +70,11 @@ class VaultActivity : AppCompatActivity() {
         val tabLayout = findViewById<TabLayout>(R.id.vaultTabLayout)
         tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_images), true)
         tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_videos))
-        tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_documents))
 
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 selectedCategory = when (tab.position) {
                     1 -> VaultCategory.VIDEOS
-                    2 -> VaultCategory.DOCUMENTS
                     else -> VaultCategory.IMAGES
                 }
                 loadVaultFiles()
@@ -114,7 +112,6 @@ class VaultActivity : AppCompatActivity() {
                 when (selectedCategory) {
                     VaultCategory.IMAGES -> FileUtils.isImageFile(file)
                     VaultCategory.VIDEOS -> FileUtils.isVideoFile(file)
-                    VaultCategory.DOCUMENTS -> !FileUtils.isImageFile(file) && !FileUtils.isVideoFile(file)
                 }
             }
 
@@ -177,6 +174,5 @@ class VaultActivity : AppCompatActivity() {
 
 enum class VaultCategory {
     IMAGES,
-    VIDEOS,
-    DOCUMENTS
+    VIDEOS
 }
