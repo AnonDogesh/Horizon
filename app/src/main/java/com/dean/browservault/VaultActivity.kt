@@ -3,6 +3,9 @@ package com.dean.browservault
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
+import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -10,13 +13,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.tabs.TabLayout
 import java.io.File
 
 class VaultActivity : AppCompatActivity() {
 
     private lateinit var recyclerView: RecyclerView
+    private lateinit var emptyState: TextView
     private lateinit var adapter: VaultAdapter
+    private var selectedCategory: VaultCategory = VaultCategory.IMAGES
 
     private val pickFileLauncher =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -29,15 +35,19 @@ class VaultActivity : AppCompatActivity() {
         setContentView(R.layout.activity_vault)
 
         recyclerView = findViewById(R.id.vaultRecyclerView)
+        emptyState = findViewById(R.id.textEmptyState)
         adapter = VaultAdapter(
             onFileClick = ::openVaultFile,
             onFileLongClick = ::confirmDelete
         )
 
-        recyclerView.layoutManager = GridLayoutManager(this, 3)
+        recyclerView.layoutManager = GridLayoutManager(this, 2)
         recyclerView.adapter = adapter
 
-        findViewById<MaterialButton>(R.id.buttonAddFile).setOnClickListener {
+        setupHeaderActions()
+        setupTabs()
+
+        findViewById<FloatingActionButton>(R.id.buttonAddFile).setOnClickListener {
             pickFileLauncher.launch(arrayOf("*/*"))
         }
 
@@ -47,6 +57,34 @@ class VaultActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         loadVaultFiles()
+    }
+
+    private fun setupHeaderActions() {
+        findViewById<ImageButton>(R.id.buttonBack).setOnClickListener { finish() }
+        findViewById<ImageButton>(R.id.buttonSearch).setOnClickListener {
+            toast(getString(R.string.msg_vault_search_coming_soon))
+        }
+    }
+
+    private fun setupTabs() {
+        val tabLayout = findViewById<TabLayout>(R.id.vaultTabLayout)
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_images), true)
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_videos))
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.vault_tab_documents))
+
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab) {
+                selectedCategory = when (tab.position) {
+                    1 -> VaultCategory.VIDEOS
+                    2 -> VaultCategory.DOCUMENTS
+                    else -> VaultCategory.IMAGES
+                }
+                loadVaultFiles()
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab) = Unit
+            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+        })
     }
 
     private fun importToVault(uri: Uri) {
@@ -70,8 +108,18 @@ class VaultActivity : AppCompatActivity() {
     }
 
     private fun loadVaultFiles() {
-        val files = FileUtils.listVaultFiles(this)
-        adapter.submitList(files)
+        val filtered = FileUtils.listVaultFiles(this)
+            .sortedByDescending { it.lastModified() }
+            .filter { file ->
+                when (selectedCategory) {
+                    VaultCategory.IMAGES -> FileUtils.isImageFile(file)
+                    VaultCategory.VIDEOS -> FileUtils.isVideoFile(file)
+                    VaultCategory.DOCUMENTS -> !FileUtils.isImageFile(file) && !FileUtils.isVideoFile(file)
+                }
+            }
+
+        adapter.submitList(filtered)
+        emptyState.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun openVaultFile(file: File) {
@@ -125,4 +173,10 @@ class VaultActivity : AppCompatActivity() {
     companion object {
         private const val FILE_PROVIDER_AUTHORITY = "com.dean.browservault.fileprovider"
     }
+}
+
+enum class VaultCategory {
+    IMAGES,
+    VIDEOS,
+    DOCUMENTS
 }

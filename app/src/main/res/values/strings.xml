@@ -31,6 +31,13 @@
     <string name="action_new_tab">New tab</string>
     <string name="msg_voice_not_ready">Voice search is coming soon</string>
     <string name="action_private_vault">Private Vault</string>
+    <string name="vault_subtitle">HORIZON SECURE</string>
+    <string name="vault_tab_images">Images</string>
+    <string name="vault_tab_videos">Videos</string>
+    <string name="vault_tab_documents">Documents</string>
+    <string name="vault_empty_state">No files in this section yet.</string>
+    <string name="vault_video_content">Video item</string>
+    <string name="msg_vault_search_coming_soon">Vault search is coming soon</string>
     <string name="action_bookmarks">Bookmarks</string>
     <string name="action_downloads">Downloads</string>
     <string name="action_desktop_site">Desktop Site</string>
