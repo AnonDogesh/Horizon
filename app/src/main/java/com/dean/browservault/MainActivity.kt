@@ -70,20 +70,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupShortcutActions() {
-        findViewById<MaterialButton>(R.id.buttonMail).setOnClickListener {
-            openUrl("https://mail.google.com")
+        findViewById<ImageButton>(R.id.shortcutChatGpt).setOnClickListener {
+            openUrl("https://chatgpt.com")
         }
-        findViewById<MaterialButton>(R.id.buttonDaily).setOnClickListener {
-            openUrl("https://news.google.com")
+        findViewById<ImageButton>(R.id.shortcutYoutube).setOnClickListener {
+            openUrl("https://youtube.com")
         }
-        findViewById<MaterialButton>(R.id.buttonMarket).setOnClickListener {
-            openUrl("https://www.tradingview.com")
+        findViewById<ImageButton>(R.id.shortcutX).setOnClickListener {
+            openUrl("https://x.com")
         }
-        findViewById<MaterialButton>(R.id.buttonCloud).setOnClickListener {
-            openUrl("https://drive.google.com")
-        }
-        findViewById<MaterialButton>(R.id.buttonAdd).setOnClickListener {
-            startActivity(Intent(this, VaultActivity::class.java))
+        findViewById<ImageButton>(R.id.shortcutInstagram).setOnClickListener {
+            openUrl("https://instagram.com")
         }
     }
 
@@ -157,6 +154,8 @@ class MainActivity : AppCompatActivity() {
         content.findViewById<android.view.View>(R.id.rowNewTab).setOnClickListener {
             dialog.dismiss()
         }
+        content.findViewById<android.view.View>(R.id.rowAddBookmark).visibility = android.view.View.GONE
+
         content.findViewById<android.view.View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
             showBookmarksDialog()

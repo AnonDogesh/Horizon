@@ -16,6 +16,7 @@ import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -42,6 +43,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var defaultUserAgent: String? = null
     private var isPageLoading = false
     private var hasRegisteredTabSession = false
+    private val promptedHosts = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -173,17 +175,13 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                         TabSessionStore.add(this@BrowserTabActivity, url)
                         hasRegisteredTabSession = true
                     }
+                    maybeHandleCredentialPrompt(url)
                 }
             }
         }
     }
 
     private fun setupTopBar() {
-        findViewById<ImageButton>(R.id.buttonHome).setOnClickListener {
-            startActivity(Intent(this, MainActivity::class.java))
-            finish()
-        }
-
         buttonReload.setOnClickListener {
             if (isPageLoading) {
                 webView.stopLoading()
@@ -214,6 +212,80 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         swipeRefresh.setOnRefreshListener {
             webView.reload()
         }
+    }
+
+    private fun maybeHandleCredentialPrompt(url: String) {
+        val host = Uri.parse(url).host ?: return
+        if (!looksLikeAuthPage(url)) return
+
+        if (!promptedHosts.add(host)) return
+
+        val existing = CredentialStore.get(this, host)
+        if (existing != null) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.title_use_saved_credentials)
+                .setMessage(getString(R.string.msg_use_saved_credentials, host))
+                .setPositiveButton(R.string.action_use) { _, _ -> autofillCredentials(existing) }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_save_credentials)
+            .setMessage(getString(R.string.msg_save_credentials_for, host))
+            .setPositiveButton(R.string.action_save) { _, _ -> showSaveCredentialDialog(host) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showSaveCredentialDialog(host: String) {
+        val usernameInput = EditText(this).apply { hint = getString(R.string.hint_username) }
+        val passwordInput = EditText(this).apply {
+            hint = getString(R.string.hint_password)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 20, 40, 0)
+            addView(usernameInput)
+            addView(passwordInput)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_save_credentials)
+            .setView(container)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val user = usernameInput.text.toString().trim()
+                val pass = passwordInput.text.toString().trim()
+                if (user.isNotEmpty() && pass.isNotEmpty()) {
+                    CredentialStore.save(this, host, user, pass)
+                    toast(getString(R.string.msg_credentials_saved))
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun autofillCredentials(credential: SavedCredential) {
+        val safeUser = credential.username.replace("'", "\\'")
+        val safePass = credential.password.replace("'", "\\'")
+        webView.evaluateJavascript(
+            """
+            (function(){
+              var user = document.querySelector('input[type=email], input[name*=user], input[name*=email], input[type=text]');
+              var pass = document.querySelector('input[type=password]');
+              if(user){user.value='$safeUser';}
+              if(pass){pass.value='$safePass';}
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    private fun looksLikeAuthPage(url: String): Boolean {
+        val lower = url.lowercase(Locale.US)
+        return lower.contains("login") || lower.contains("signin") || lower.contains("signup") || lower.contains("register")
     }
 
     private fun updateReloadButton() {
@@ -272,8 +344,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
-            addCurrentPageToBookmarks()
             showBookmarksDialog()
+        }
+        content.findViewById<View>(R.id.rowAddBookmark).apply {
+            visibility = View.VISIBLE
+            setOnClickListener {
+                dialog.dismiss()
+                addCurrentPageToBookmarks()
+            }
         }
         content.findViewById<View>(R.id.rowHistory).setOnClickListener {
             dialog.dismiss()
