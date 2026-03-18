@@ -1,15 +1,18 @@
 package com.dean.browservault
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.util.Xml
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
@@ -24,6 +27,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var inputSearch: EditText
     private lateinit var searchEngineSpinner: Spinner
+    private lateinit var feedPrefs: SharedPreferences
     private val feedCards = mutableListOf<MaterialCardView>()
     private val feedTitles = mutableListOf<TextView>()
     @Volatile
@@ -40,6 +44,7 @@ class MainActivity : AppCompatActivity() {
 
         inputSearch = findViewById(R.id.inputSearch)
         searchEngineSpinner = findViewById(R.id.spinnerSearchEngineHome)
+        feedPrefs = getSharedPreferences(FEED_PREFS, MODE_PRIVATE)
 
         setupSearchEngineSpinner()
         setupTopActions()
@@ -79,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<TextView>(R.id.textCustomize).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            showCustomizeFeedDialog()
         }
     }
 
@@ -122,7 +127,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadRealNewsFeed() {
         Thread {
-            val fetchedNews = runCatching { fetchTopNews() }.getOrDefault(emptyList())
+            val fetchedNews = runCatching { fetchTopNews(buildNewsFeedUrl()) }.getOrDefault(emptyList())
             runOnUiThread {
                 if (fetchedNews.isNotEmpty()) {
                     topNews = fetchedNews
@@ -143,9 +148,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun fetchTopNews(): List<NewsItem> {
+    private fun fetchTopNews(url: String): List<NewsItem> {
         val parser = Xml.newPullParser()
-        URL(NEWS_RSS_URL).openStream().use { input ->
+        URL(url).openStream().use { input ->
             parser.setInput(input, null)
             var eventType = parser.eventType
             val items = mutableListOf<NewsItem>()
@@ -180,6 +185,64 @@ class MainActivity : AppCompatActivity() {
                 eventType = parser.next()
             }
             return items
+        }
+    }
+
+    private fun showCustomizeFeedDialog() {
+        val countries = listOf("US", "GB", "IN", "CA", "AU")
+        val categories = listOf("Top", "World", "Business", "Technology", "Sports", "Health")
+
+        val countrySpinner = Spinner(this)
+        countrySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, countries).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        countrySpinner.setSelection(countries.indexOf(selectedCountry()).coerceAtLeast(0))
+
+        val categorySpinner = Spinner(this)
+        categorySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        categorySpinner.setSelection(categories.indexOf(selectedCategory()).coerceAtLeast(0))
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 8)
+            addView(TextView(this@MainActivity).apply { text = getString(R.string.feed_country_label) })
+            addView(countrySpinner)
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.feed_category_label)
+                setPadding(0, 20, 0, 0)
+            })
+            addView(categorySpinner)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_customize_feed)
+            .setView(content)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                feedPrefs.edit()
+                    .putString(KEY_FEED_COUNTRY, countries[countrySpinner.selectedItemPosition])
+                    .putString(KEY_FEED_CATEGORY, categories[categorySpinner.selectedItemPosition])
+                    .apply()
+                loadRealNewsFeed()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun selectedCountry(): String = feedPrefs.getString(KEY_FEED_COUNTRY, "US").orEmpty()
+
+    private fun selectedCategory(): String = feedPrefs.getString(KEY_FEED_CATEGORY, "Top").orEmpty()
+
+    private fun buildNewsFeedUrl(): String {
+        val country = selectedCountry()
+        val category = selectedCategory()
+        val topic = CATEGORY_TO_TOPIC[category]
+        val language = "en-$country"
+        return if (topic == null) {
+            "https://news.google.com/rss?hl=$language&gl=$country&ceid=$country:en"
+        } else {
+            "https://news.google.com/rss/headlines/section/topic/$topic?hl=$language&gl=$country&ceid=$country:en"
         }
     }
 
@@ -281,6 +344,16 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val MAX_NEWS_ITEMS = 5
-        private const val NEWS_RSS_URL = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
+        private const val FEED_PREFS = "feed_preferences"
+        private const val KEY_FEED_COUNTRY = "feed_country"
+        private const val KEY_FEED_CATEGORY = "feed_category"
+        private val CATEGORY_TO_TOPIC = mapOf(
+            "Top" to null,
+            "World" to "WORLD",
+            "Business" to "BUSINESS",
+            "Technology" to "TECHNOLOGY",
+            "Sports" to "SPORTS",
+            "Health" to "HEALTH"
+        )
     }
 }

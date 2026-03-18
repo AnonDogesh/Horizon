@@ -343,13 +343,56 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun showVideoCandidatesMenu(anchor: View) {
+        val loadingPopup = showVideoLoadingPopup(anchor)
         buildVideoCandidates { candidates ->
+            loadingPopup.dismiss()
             if (candidates.isEmpty()) {
                 toast(getString(R.string.msg_no_active_video))
                 return@buildVideoCandidates
             }
             showVideoCandidatePopup(anchor, candidates)
         }
+    }
+
+    private fun showVideoLoadingPopup(anchor: View): PopupWindow {
+        currentFloatingMenu?.dismiss()
+        val loadingView = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(14).toFloat()
+                setColor(Color.parseColor("#1B2218"))
+                setStroke(dp(1), Color.parseColor("#2F3A2A"))
+            }
+            addView(android.widget.ProgressBar(this@BrowserTabActivity).apply {
+                isIndeterminate = true
+            })
+            addView(TextView(this@BrowserTabActivity).apply {
+                text = getString(R.string.msg_loading_video_candidates)
+                setTextColor(Color.parseColor("#E6ECD7"))
+                setPadding(dp(10), 0, 0, 0)
+            })
+        }
+
+        val popup = PopupWindow(
+            loadingView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            false
+        ).apply {
+            isOutsideTouchable = false
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        loadingView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val anchorLocation = IntArray(2).also { anchor.getLocationOnScreen(it) }
+        val x = ((resources.displayMetrics.widthPixels - loadingView.measuredWidth) / 2).coerceAtLeast(dp(8))
+        val y = (anchorLocation[1] - loadingView.measuredHeight - dp(8)).coerceAtLeast(dp(8))
+        popup.showAtLocation(window.decorView, Gravity.NO_GRAVITY, x, y)
+        currentFloatingMenu = popup
+        return popup
     }
 
     private fun showFloatingGridMenu(
@@ -538,9 +581,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         val play = MaterialButton(this).apply {
             text = getString(R.string.action_watch)
             setOnClickListener {
-                currentFloatingMenu?.dismiss()
-                pauseWebVideos()
                 openNativeVideoPlayer(candidate.url)
+                currentFloatingMenu?.dismiss()
             }
         }
         val download = MaterialButton(this).apply {
@@ -790,21 +832,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 .forEach { url -> recordDetectedMediaUrl(url) }
             onComplete?.invoke()
         }
-    }
-
-    private fun pauseWebVideos() {
-        webView.evaluateJavascript(
-            """
-            (function() {
-              document.querySelectorAll('video').forEach(function(video) {
-                try { video.pause(); } catch (e) {}
-              });
-            })();
-            """.trimIndent(),
-            null
-        )
-        currentPlayingVideoUrl = null
-        updateVideoActionButton()
     }
 
     private fun parseJavascriptString(rawValue: String?): String? {

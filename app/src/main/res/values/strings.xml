@@ -26,6 +26,9 @@
     <string name="action_cloud">Cloud</string>
     <string name="action_add">Add</string>
     <string name="action_customize_feed">Customize Feed</string>
+    <string name="title_customize_feed">Customize News Feed</string>
+    <string name="feed_country_label">Nation</string>
+    <string name="feed_category_label">Category</string>
     <string name="action_clear_history">Clear history</string>
     <string name="action_voice">Voice</string>
     <string name="action_clear">Clear</string>
@@ -87,6 +90,7 @@
     <string name="action_download">Download</string>
     <string name="action_watch">Watch</string>
     <string name="msg_no_active_video">No active video detected</string>
+    <string name="msg_loading_video_candidates">Collecting videos…</string>
     <string name="msg_video_action_unavailable">This video cannot be opened in the native player</string>
     <string name="action_close">Close</string>
     <string name="label_size_unknown">Size unknown</string>
