@@ -131,11 +131,10 @@ class VaultActivity : AppCompatActivity() {
 
         if (FileUtils.isImageFile(file)) {
             val uri = FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, file)
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "image/*")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(intent)
+            startActivity(
+                Intent(this, ImageViewerActivity::class.java)
+                    .putExtra(ImageViewerActivity.EXTRA_IMAGE_URI, uri.toString())
+            )
             return
         }
 

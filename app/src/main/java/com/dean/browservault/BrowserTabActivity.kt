@@ -3,11 +3,20 @@ package com.dean.browservault
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -15,18 +24,26 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
+import java.io.FileOutputStream
+import java.net.URL
 import java.util.Locale
 
 class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
@@ -36,26 +53,41 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private lateinit var buttonReload: ImageButton
     private lateinit var engineSpinner: Spinner
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var loadingProgress: LinearProgressIndicator
+    private lateinit var videoActionButton: FloatingActionButton
     private lateinit var prefs: SharedPreferences
 
     private val adBlocker = AdBlocker()
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
     private var isPageLoading = false
-    private var hasRegisteredTabSession = false
+    private var isDesktopMode = false
+    private var currentTabUrl: String? = null
+    private var currentPlayingVideoUrl: String? = null
+    private var lastTouchRawX = 0f
+    private var lastTouchRawY = 0f
+    private var currentFloatingMenu: PopupWindow? = null
     private val promptedHosts = mutableSetOf<String>()
+
+    private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val url = result.data?.getStringExtra(SavedSitesActivity.EXTRA_SELECTED_URL) ?: return@registerForActivityResult
+        loadUrlOrVideo(url)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_browser_tab)
 
         prefs = getSharedPreferences(BrowserPreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        isDesktopMode = intent.getBooleanExtra(EXTRA_DESKTOP_MODE, false)
 
         webView = findViewById(R.id.webView)
         searchInput = findViewById(R.id.searchInput)
         buttonReload = findViewById(R.id.buttonReload)
         engineSpinner = findViewById(R.id.spinnerSearchEngineBrowser)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+        loadingProgress = findViewById(R.id.loadingProgress)
+        videoActionButton = findViewById(R.id.buttonVideoActions)
 
         setupSearchEngineSpinner()
         configureWebView()
@@ -64,6 +96,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         setupBottomBar()
         setupBackNavigation()
         setupSwipeRefresh()
+        setupLongPressActions()
+        setupVideoActionButton()
+        updateVideoActionButton()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
@@ -83,16 +118,12 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     override fun onStop() {
         prefs.unregisterOnSharedPreferenceChangeListener(this)
+        currentFloatingMenu?.dismiss()
         super.onStop()
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key in setOf(
-                BrowserPreferences.KEY_AD_BLOCKER,
-                BrowserPreferences.KEY_JAVASCRIPT,
-                BrowserPreferences.KEY_DESKTOP_MODE
-            )
-        ) {
+        if (key in setOf(BrowserPreferences.KEY_AD_BLOCKER, BrowserPreferences.KEY_JAVASCRIPT)) {
             applyBrowserSettings(reloadPage = true)
         }
     }
@@ -126,9 +157,25 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = true
-            setSupportZoom(false)
-            builtInZoomControls = false
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
+        }
+        webView.addJavascriptInterface(BrowserJsBridge(), JS_BRIDGE_NAME)
+        webView.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE) {
+                lastTouchRawX = event.rawX
+                lastTouchRawY = event.rawY
+            }
+            false
+        }
+
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                loadingProgress.progress = newProgress
+                loadingProgress.visibility = if (newProgress in 0..99) View.VISIBLE else View.GONE
+            }
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -145,12 +192,17 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame) return false
+
                 val target = request.url.toString()
-                if (request.isForMainFrame && isVideoUrl(target)) {
-                    startActivity(
-                        Intent(this@BrowserTabActivity, VideoPlayerActivity::class.java)
-                            .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, target)
-                    )
+                if (isVideoUrl(target)) {
+                    openNativeVideoPlayer(target)
+                    return true
+                }
+
+                val scheme = request.url.scheme.orEmpty().lowercase(Locale.US)
+                if (scheme in setOf("http", "https")) {
+                    loadWebPage(target)
                     return true
                 }
                 return false
@@ -159,6 +211,10 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
+                currentPlayingVideoUrl = null
+                updateVideoActionButton()
+                loadingProgress.progress = 0
+                loadingProgress.visibility = View.VISIBLE
                 updateReloadButton()
             }
 
@@ -166,16 +222,16 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 super.onPageFinished(view, url)
                 isPageLoading = false
                 swipeRefresh.isRefreshing = false
+                loadingProgress.visibility = View.GONE
                 updateReloadButton()
 
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
-                    rememberHistory(url)
-                    if (!hasRegisteredTabSession) {
-                        TabSessionStore.add(this@BrowserTabActivity, url)
-                        hasRegisteredTabSession = true
-                    }
+                    SavedSiteStore.add(this@BrowserTabActivity, SavedSiteStore.TYPE_HISTORY, url)
+                    syncTabSession(url)
                     maybeHandleCredentialPrompt(url)
+                    injectVideoObserver()
+                    refreshPlayingVideoStateFromPage()
                 }
             }
         }
@@ -187,9 +243,10 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 webView.stopLoading()
                 isPageLoading = false
                 swipeRefresh.isRefreshing = false
+                loadingProgress.visibility = View.GONE
                 updateReloadButton()
             } else {
-                webView.reload()
+                reloadCurrentPage()
             }
         }
 
@@ -209,9 +266,240 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun setupSwipeRefresh() {
         swipeRefresh.setColorSchemeColors(Color.parseColor("#B8C58A"))
-        swipeRefresh.setOnRefreshListener {
-            webView.reload()
+        swipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            webView.scrollY > 0 || webView.canScrollVertically(-1)
         }
+        swipeRefresh.setOnRefreshListener {
+            if (webView.scrollY == 0 && !webView.canScrollVertically(-1)) {
+                reloadCurrentPage()
+            } else {
+                swipeRefresh.isRefreshing = false
+            }
+        }
+    }
+
+    private fun setupLongPressActions() {
+        webView.setOnLongClickListener {
+            val hitResult = webView.hitTestResult ?: return@setOnLongClickListener false
+            val mediaUrl = when (hitResult.type) {
+                WebView.HitTestResult.IMAGE_TYPE,
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> hitResult.extra
+                else -> null
+            }
+
+            if (mediaUrl.isNullOrBlank() || !looksLikeImageAsset(mediaUrl)) {
+                return@setOnLongClickListener false
+            }
+
+            showMediaMenu(mediaUrl, lastTouchRawX.toInt(), lastTouchRawY.toInt())
+            true
+        }
+    }
+
+    private fun setupVideoActionButton() {
+        videoActionButton.setOnClickListener {
+            if (currentPlayingVideoUrl.isNullOrBlank()) {
+                toast(getString(R.string.msg_no_active_video))
+            } else {
+                showVideoMenu(videoActionButton)
+            }
+        }
+    }
+
+    private fun updateVideoActionButton() {
+        val hasVideo = !currentPlayingVideoUrl.isNullOrBlank()
+        videoActionButton.alpha = if (hasVideo) 1f else 0.45f
+        videoActionButton.backgroundTintList = ColorStateList.valueOf(
+            Color.parseColor(if (hasVideo) "#C7D0A5" else "#2A3126")
+        )
+        videoActionButton.imageTintList = ColorStateList.valueOf(
+            Color.parseColor(if (hasVideo) "#11140F" else "#AAB58A")
+        )
+    }
+
+    private fun showMediaMenu(url: String, rawX: Int, rawY: Int) {
+        showFloatingGridMenu(
+            actions = listOf(
+                MenuAction(R.string.action_view_in_new_tab) {
+                    startActivity(Intent(this, BrowserTabActivity::class.java).putExtra(EXTRA_URL, url))
+                },
+                MenuAction(R.string.action_share) { shareMedia(url) },
+                MenuAction(R.string.action_download) { downloadMedia(url) },
+                MenuAction(R.string.action_close) {}
+            ),
+            rawX = rawX,
+            rawY = rawY,
+            anchorView = null
+        )
+    }
+
+    private fun showVideoMenu(anchor: View) {
+        showFloatingGridMenu(
+            actions = listOf(
+                MenuAction(R.string.action_watch) { watchCurrentVideo() },
+                MenuAction(R.string.action_download) {
+                    val url = currentPlayingVideoUrl
+                    if (url.isNullOrBlank()) {
+                        toast(getString(R.string.msg_no_active_video))
+                    } else {
+                        downloadMedia(url)
+                    }
+                }
+            ),
+            rawX = null,
+            rawY = null,
+            anchorView = anchor
+        )
+    }
+
+    private fun showFloatingGridMenu(
+        actions: List<MenuAction>,
+        rawX: Int?,
+        rawY: Int?,
+        anchorView: View?
+    ) {
+        currentFloatingMenu?.dismiss()
+
+        val menuView = createFloatingMenuView(actions)
+        val popupWindow = PopupWindow(menuView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popupWindow.isOutsideTouchable = true
+        popupWindow.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        menuView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+
+        val popupWidth = menuView.measuredWidth
+        val popupHeight = menuView.measuredHeight
+        val displayMetrics = resources.displayMetrics
+
+        val (x, y) = if (anchorView != null) {
+            val location = IntArray(2)
+            anchorView.getLocationOnScreen(location)
+            val anchorX = location[0] + (anchorView.width / 2) - (popupWidth / 2)
+            val anchorY = location[1] - popupHeight - dp(12)
+            clampPopupPosition(anchorX, anchorY, popupWidth, popupHeight, displayMetrics.widthPixels, displayMetrics.heightPixels)
+        } else {
+            val touchX = rawX ?: displayMetrics.widthPixels / 2
+            val touchY = rawY ?: displayMetrics.heightPixels / 2
+            clampPopupPosition(
+                touchX - (popupWidth / 2),
+                touchY - (popupHeight / 2),
+                popupWidth,
+                popupHeight,
+                displayMetrics.widthPixels,
+                displayMetrics.heightPixels
+            )
+        }
+
+        popupWindow.showAtLocation(window.decorView, Gravity.NO_GRAVITY, x, y)
+        currentFloatingMenu = popupWindow
+    }
+
+    private fun clampPopupPosition(
+        x: Int,
+        y: Int,
+        popupWidth: Int,
+        popupHeight: Int,
+        screenWidth: Int,
+        screenHeight: Int
+    ): Pair<Int, Int> {
+        val clampedX = x.coerceIn(dp(8), (screenWidth - popupWidth - dp(8)).coerceAtLeast(dp(8)))
+        val clampedY = y.coerceIn(dp(8), (screenHeight - popupHeight - dp(8)).coerceAtLeast(dp(8)))
+        return clampedX to clampedY
+    }
+
+    private fun createFloatingMenuView(actions: List<MenuAction>): View {
+        val background = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(18).toFloat()
+            setColor(Color.parseColor("#1B2218"))
+            setStroke(dp(1), Color.parseColor("#2F3A2A"))
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = background
+            elevation = dp(12).toFloat()
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+
+        val grid = GridLayout(this).apply {
+            columnCount = 2
+        }
+
+        actions.forEach { action ->
+            grid.addView(
+                TextView(this).apply {
+                    text = getString(action.labelRes)
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.parseColor("#E6ECD7"))
+                    setBackgroundResource(android.R.color.transparent)
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    minWidth = dp(88)
+                    minHeight = dp(72)
+                    setOnClickListener {
+                        currentFloatingMenu?.dismiss()
+                        action.onClick()
+                    }
+                }
+            )
+        }
+
+        container.addView(grid)
+        return container
+    }
+
+    private fun watchCurrentVideo() {
+        val url = currentPlayingVideoUrl
+        if (url.isNullOrBlank() || !isDirectPlayableMediaUrl(url)) {
+            toast(getString(R.string.msg_video_action_unavailable))
+            return
+        }
+        pauseWebVideos()
+        openNativeVideoPlayer(url)
+    }
+
+    private fun openNativeVideoPlayer(url: String) {
+        startActivity(
+            Intent(this, VideoPlayerActivity::class.java)
+                .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, url)
+        )
+    }
+
+    private fun shareMedia(url: String) {
+        startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, url)
+                },
+                getString(R.string.action_share)
+            )
+        )
+    }
+
+    private fun downloadMedia(url: String) {
+        if (!isDownloadableMediaUrl(url)) {
+            toast(getString(R.string.msg_media_download_failed))
+            return
+        }
+        Thread {
+            val result = runCatching {
+                val downloadsDir = FileUtils.ensureDownloadsDirectory(this)
+                val fileName = FileUtils.filenameFromUrl(url, "media")
+                val destination = FileUtils.createUniqueFile(downloadsDir, fileName)
+                URL(url).openStream().use { input ->
+                    FileOutputStream(destination).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                destination
+            }
+            runOnUiThread {
+                result
+                    .onSuccess { file -> toast(getString(R.string.msg_media_downloaded, file.name)) }
+                    .onFailure { toast(getString(R.string.msg_media_download_failed)) }
+            }
+        }.start()
     }
 
     private fun maybeHandleCredentialPrompt(url: String) {
@@ -247,7 +535,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(40, 20, 40, 0)
+            setPadding(dp(20), dp(12), dp(20), 0)
             addView(usernameInput)
             addView(passwordInput)
         }
@@ -283,9 +571,89 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         )
     }
 
+    private fun injectVideoObserver() {
+        webView.evaluateJavascript(
+            """
+            (function() {
+              var bridge = window.$JS_BRIDGE_NAME;
+              if (!bridge) return;
+              function notify(video, state) {
+                var src = video.currentSrc || video.src || '';
+                bridge.onVideoState(src, state);
+              }
+              function attach(video) {
+                if (!video || video.__horizonAttached) return;
+                video.__horizonAttached = true;
+                video.addEventListener('play', function() { notify(video, 'play'); });
+                video.addEventListener('playing', function() { notify(video, 'play'); });
+                video.addEventListener('pause', function() { notify(video, 'pause'); });
+                video.addEventListener('ended', function() { notify(video, 'pause'); });
+                if (!video.paused && !video.ended) {
+                  notify(video, 'play');
+                }
+              }
+              document.querySelectorAll('video').forEach(attach);
+              if (!window.__horizonVideoObserver) {
+                window.__horizonVideoObserver = new MutationObserver(function() {
+                  document.querySelectorAll('video').forEach(attach);
+                });
+                window.__horizonVideoObserver.observe(document.documentElement, { childList: true, subtree: true });
+              }
+            })();
+            """.trimIndent(),
+            null
+        )
+    }
+
+    private fun refreshPlayingVideoStateFromPage() {
+        webView.evaluateJavascript(
+            """
+            (function() {
+              var video = Array.from(document.querySelectorAll('video')).find(function(item) {
+                return !item.paused && !item.ended;
+              });
+              return video ? (video.currentSrc || video.src || '') : '';
+            })();
+            """.trimIndent()
+        ) { rawValue ->
+            currentPlayingVideoUrl = parseJavascriptString(rawValue)
+            updateVideoActionButton()
+        }
+    }
+
+    private fun pauseWebVideos() {
+        webView.evaluateJavascript(
+            """
+            (function() {
+              document.querySelectorAll('video').forEach(function(video) {
+                try { video.pause(); } catch (e) {}
+              });
+            })();
+            """.trimIndent(),
+            null
+        )
+        currentPlayingVideoUrl = null
+        updateVideoActionButton()
+    }
+
+    private fun parseJavascriptString(rawValue: String?): String? {
+        val value = rawValue.orEmpty().trim()
+        if (value.isBlank() || value == "null" || value == "\"\"") return null
+        return value.removeSurrounding("\"")
+            .replace("\\/", "/")
+            .replace("\\u003C", "<")
+            .replace("\\n", "")
+            .takeIf { it.isNotBlank() }
+    }
+
     private fun looksLikeAuthPage(url: String): Boolean {
         val lower = url.lowercase(Locale.US)
         return lower.contains("login") || lower.contains("signin") || lower.contains("signup") || lower.contains("register")
+    }
+
+    private fun looksLikeImageAsset(url: String): Boolean {
+        val lower = url.lowercase(Locale.US)
+        return listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp").any(lower::contains)
     }
 
     private fun updateReloadButton() {
@@ -344,7 +712,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
-            showBookmarksDialog()
+            openSavedSites(SavedSiteStore.TYPE_BOOKMARKS)
         }
         content.findViewById<View>(R.id.rowAddBookmark).apply {
             visibility = View.VISIBLE
@@ -355,7 +723,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowHistory).setOnClickListener {
             dialog.dismiss()
-            showHistoryDialog()
+            openSavedSites(SavedSiteStore.TYPE_HISTORY)
         }
         content.findViewById<View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
@@ -363,9 +731,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
 
         val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
-        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
+        desktopSwitch.isChecked = isDesktopMode
         desktopSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
+            setDesktopModeEnabled(checked)
         }
 
         dialog.show()
@@ -373,71 +741,84 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun addCurrentPageToBookmarks() {
         val url = webView.url ?: return
-        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
-        val list = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toMutableList()
-        list.remove(url)
-        list.add(0, url)
-        prefs.edit().putStringSet(KEY_BOOKMARKS, list.take(MAX_BOOKMARKS).toSet()).apply()
+        SavedSiteStore.add(this, SavedSiteStore.TYPE_BOOKMARKS, url)
         toast(getString(R.string.msg_bookmark_saved))
     }
 
-    private fun showBookmarksDialog() {
-        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toList().sortedDescending()
+    private fun openSavedSites(type: String) {
+        val entries = SavedSiteStore.list(this, type)
         if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_bookmarks))
+            toast(getString(if (type == SavedSiteStore.TYPE_HISTORY) R.string.msg_no_history else R.string.msg_no_bookmarks))
             return
         }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.action_bookmarks)
-            .setItems(entries.toTypedArray()) { _, which ->
-                loadUrlOrVideo(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun rememberHistory(url: String) {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val existing = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toMutableList()
-        existing.remove(url)
-        existing.add(0, url)
-        prefs.edit().putStringSet(KEY_HISTORY, existing.take(MAX_HISTORY).toSet()).apply()
-    }
-
-    private fun showHistoryDialog() {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toList().sortedDescending()
-
-        if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_history))
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.nav_history)
-            .setItems(entries.toTypedArray()) { _, which ->
-                loadUrlOrVideo(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        savedSitesLauncher.launch(SavedSitesActivity.createIntent(this, type))
     }
 
     private fun performSearch(query: String) {
         val selectedEngine = SearchEngineManager.selectedEngine(this)
         val url = SearchEngineManager.buildSearchUrl(selectedEngine, query)
-        webView.loadUrl(url)
+        loadWebPage(url)
     }
 
     private fun loadUrlOrVideo(url: String) {
         if (isVideoUrl(url)) {
-            startActivity(
-                Intent(this, VideoPlayerActivity::class.java)
-                    .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, url)
-            )
+            openNativeVideoPlayer(url)
         } else {
-            webView.loadUrl(url)
+            loadWebPage(url)
+        }
+    }
+
+    private fun loadWebPage(url: String) {
+        val normalizedUrl = normalizeUrlForMode(url)
+        val headers = buildRequestHeaders()
+        if (headers.isEmpty()) {
+            webView.loadUrl(normalizedUrl)
+        } else {
+            webView.loadUrl(normalizedUrl, headers)
+        }
+    }
+
+    private fun reloadCurrentPage() {
+        val currentUrl = webView.url
+        if (currentUrl.isNullOrBlank()) {
+            webView.reload()
+            return
+        }
+        webView.stopLoading()
+        webView.clearCache(false)
+        loadWebPage(currentUrl)
+    }
+
+    private fun buildRequestHeaders(): Map<String, String> {
+        val userAgent = webView.settings.userAgentString ?: return emptyMap()
+        return mapOf(
+            "User-Agent" to userAgent,
+            "X-Requested-With" to ""
+        )
+    }
+
+    private fun normalizeUrlForMode(url: String): String {
+        if (!isDesktopMode) return url
+        val uri = Uri.parse(url)
+        val host = uri.host.orEmpty().lowercase(Locale.US)
+        if (host == "m.youtube.com" || host == "youtube.com") {
+            return uri.buildUpon().authority("www.youtube.com").build().toString()
+        }
+        return url
+    }
+
+    private fun syncTabSession(url: String) {
+        TabSessionStore.upsert(this, currentTabUrl, url, isDesktopMode)
+        currentTabUrl = url
+    }
+
+    private fun setDesktopModeEnabled(enabled: Boolean) {
+        if (isDesktopMode == enabled) return
+        isDesktopMode = enabled
+        applyBrowserSettings(reloadPage = true)
+        val currentUrl = webView.url ?: currentTabUrl
+        if (!currentUrl.isNullOrBlank()) {
+            syncTabSession(currentUrl)
         }
     }
 
@@ -446,44 +827,72 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         return lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")
     }
 
+    private fun isDirectPlayableMediaUrl(url: String): Boolean {
+        if (url.startsWith("blob:")) return false
+        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https", "content", "file")
+    }
+
+    private fun isDownloadableMediaUrl(url: String): Boolean {
+        if (url.startsWith("blob:")) return false
+        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https")
+    }
+
     @Suppress("SetJavaScriptEnabled")
     private fun applyBrowserSettings(reloadPage: Boolean) {
         val jsEnabled = prefs.getBoolean(BrowserPreferences.KEY_JAVASCRIPT, true)
-        val desktopMode = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
         isAdBlockEnabled = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
 
         webView.settings.javaScriptEnabled = jsEnabled
         webView.settings.domStorageEnabled = true
-        webView.settings.useWideViewPort = desktopMode
-        webView.settings.loadWithOverviewMode = desktopMode
-        webView.settings.userAgentString = if (desktopMode) {
+        webView.settings.useWideViewPort = isDesktopMode
+        webView.settings.loadWithOverviewMode = isDesktopMode
+        webView.settings.userAgentString = if (isDesktopMode) {
             DESKTOP_USER_AGENT
         } else {
             defaultUserAgent ?: webView.settings.userAgentString
         }
 
         if (reloadPage && webView.url != null) {
-            webView.reload()
+            reloadCurrentPage()
         }
     }
+
+    private fun dp(value: Int): Int = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP,
+        value.toFloat(),
+        resources.displayMetrics
+    ).toInt()
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
+    private data class MenuAction(
+        val labelRes: Int,
+        val onClick: () -> Unit
+    )
+
+    private inner class BrowserJsBridge {
+        @JavascriptInterface
+        fun onVideoState(url: String?, state: String?) {
+            runOnUiThread {
+                if (state == "play") {
+                    currentPlayingVideoUrl = url?.takeIf { it.isNotBlank() }
+                    updateVideoActionButton()
+                } else {
+                    refreshPlayingVideoStateFromPage()
+                }
+            }
+        }
+    }
+
     companion object {
         const val EXTRA_QUERY = "extra_query"
         const val EXTRA_URL = "extra_url"
-
-        private const val HISTORY_PREFS = "home_history"
-        private const val KEY_HISTORY = "history_list"
-        private const val MAX_HISTORY = 50
-
-        private const val BOOKMARK_PREFS = "bookmarks"
-        private const val KEY_BOOKMARKS = "bookmark_list"
-        private const val MAX_BOOKMARKS = 50
+        const val EXTRA_DESKTOP_MODE = "extra_desktop_mode"
 
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        private const val JS_BRIDGE_NAME = "HorizonBridge"
     }
 }

@@ -1,148 +1,174 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E110C"
-    android:orientation="vertical"
-    android:paddingTop="10dp">
+    android:background="#0E110C">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
-        android:background="#171D15"
-        android:gravity="center_vertical"
-        android:minHeight="44dp"
-        android:orientation="horizontal"
-        android:paddingStart="6dp"
-        android:paddingEnd="6dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="10dp">
 
-        <EditText
-            android:id="@+id/searchInput"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:hint="@string/hint_search"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:maxLines="1"
-            android:padding="0dp"
-            android:textColor="#E6ECD7"
-            android:textColorHint="#8E9980"
-            android:textSize="14sp" />
-
-        <ImageButton
-            android:id="@+id/buttonClearSearch"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_clear"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
-            app:tint="#C7D0A5" />
-
-        <Spinner
-            android:id="@+id/spinnerSearchEngineBrowser"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="4dp"
-            android:background="#171D15"
-            android:minWidth="72dp"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp" />
-
-        <ImageButton
-            android:id="@+id/buttonReload"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="4dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_refresh"
-            android:src="@android:drawable/ic_popup_sync"
-            app:tint="#C7D0A5" />
-
-        <ImageButton
-            android:id="@+id/buttonSearch"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
-            android:layout_marginStart="4dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_search"
-            android:src="@android:drawable/ic_menu_search"
-            app:tint="#C7D0A5" />
-    </LinearLayout>
-
-    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-        android:id="@+id/swipeRefresh"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <WebView
-            android:id="@+id/webView"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:background="#171D15"
+            android:gravity="center_vertical"
+            android:minHeight="44dp"
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp">
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#161C13"
-        android:gravity="center"
-        android:orientation="horizontal"
-        android:padding="8dp">
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/hint_search"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:padding="0dp"
+                android:textColor="#E6ECD7"
+                android:textColorHint="#8E9980"
+                android:textSize="14sp" />
 
-        <ImageButton
-            android:id="@+id/bottomBack"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_back"
-            android:src="@android:drawable/ic_media_previous"
-            app:tint="#C7D0A5" />
+            <ImageButton
+                android:id="@+id/buttonClearSearch"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_clear"
+                android:src="@android:drawable/ic_menu_close_clear_cancel"
+                app:tint="#C7D0A5" />
 
-        <ImageButton
-            android:id="@+id/bottomForward"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_forward"
-            android:src="@android:drawable/ic_media_next"
-            app:tint="#C7D0A5" />
+            <Spinner
+                android:id="@+id/spinnerSearchEngineBrowser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:background="#171D15"
+                android:minWidth="72dp"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp" />
 
-        <ImageButton
-            android:id="@+id/bottomNewTab"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_new_tab"
-            android:src="@android:drawable/ic_input_add"
-            app:tint="#C7D0A5" />
+            <ImageButton
+                android:id="@+id/buttonReload"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginStart="4dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_refresh"
+                android:src="@android:drawable/ic_popup_sync"
+                app:tint="#C7D0A5" />
 
-        <ImageButton
-            android:id="@+id/bottomTabs"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_tabs"
-            android:src="@android:drawable/ic_menu_agenda"
-            app:tint="#C7D0A5" />
+            <ImageButton
+                android:id="@+id/buttonSearch"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginStart="4dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_search"
+                android:src="@android:drawable/ic_menu_search"
+                app:tint="#C7D0A5" />
+        </LinearLayout>
 
-        <ImageButton
-            android:id="@+id/bottomMenu"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/action_menu"
-            android:src="@android:drawable/ic_menu_sort_by_size"
-            app:tint="#C7D0A5" />
+        <com.google.android.material.progressindicator.LinearProgressIndicator
+            android:id="@+id/loadingProgress"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:indeterminate="false"
+            android:visibility="gone"
+            app:indicatorColor="#B8C58A"
+            app:trackColor="#223025" />
+
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipeRefresh"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <WebView
+                android:id="@+id/webView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#161C13"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <ImageButton
+                android:id="@+id/bottomBack"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_back"
+                android:src="@android:drawable/ic_media_previous"
+                app:tint="#C7D0A5" />
+
+            <ImageButton
+                android:id="@+id/bottomForward"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_forward"
+                android:src="@android:drawable/ic_media_next"
+                app:tint="#C7D0A5" />
+
+            <ImageButton
+                android:id="@+id/bottomNewTab"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_new_tab"
+                android:src="@android:drawable/ic_input_add"
+                app:tint="#C7D0A5" />
+
+            <ImageButton
+                android:id="@+id/bottomTabs"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_tabs"
+                android:src="@android:drawable/ic_menu_agenda"
+                app:tint="#C7D0A5" />
+
+            <ImageButton
+                android:id="@+id/bottomMenu"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/action_menu"
+                android:src="@android:drawable/ic_menu_sort_by_size"
+                app:tint="#C7D0A5" />
+        </LinearLayout>
     </LinearLayout>
 
-</LinearLayout>
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/buttonVideoActions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="88dp"
+        android:contentDescription="@string/action_watch"
+        android:src="@android:drawable/ic_media_play"
+        app:backgroundTint="#2A3126"
+        app:tint="#AAB58A" />
+
+</FrameLayout>

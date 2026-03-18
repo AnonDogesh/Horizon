@@ -47,11 +47,23 @@
     <string name="hint_username">Username or email</string>
     <string name="hint_password">Password</string>
     <string name="action_use">Use</string>
+    <string name="action_save">Save</string>
     <string name="msg_credentials_saved">Credentials saved</string>
     <string name="action_downloads">Downloads</string>
+    <string name="title_bookmarks">Bookmarks</string>
+    <string name="title_history">History</string>
     <string name="action_more">More actions</string>
     <string name="action_move_to_vault">Move to vault</string>
     <string name="msg_no_downloads">No downloads found.</string>
+
+    <plurals name="saved_sites_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="msg_delete_saved_sites_confirm">
+        <item quantity="one">Delete %d website?</item>
+        <item quantity="other">Delete %d websites?</item>
+    </plurals>
 
     <plurals name="downloads_selected_count">
         <item quantity="one">%d selected</item>
@@ -70,6 +82,15 @@
         <item quantity="other">Moved %d files to vault</item>
     </plurals>
     <string name="action_desktop_site">Desktop Site</string>
+    <string name="action_view_in_new_tab">View in new tab</string>
+    <string name="action_share">Share</string>
+    <string name="action_download">Download</string>
+    <string name="action_watch">Watch</string>
+    <string name="msg_no_active_video">No active video detected</string>
+    <string name="msg_video_action_unavailable">This video cannot be opened in the native player</string>
+    <string name="action_close">Close</string>
+    <string name="msg_media_downloaded">Saved %1$s to downloads</string>
+    <string name="msg_media_download_failed">Could not download media</string>
     <string name="msg_bookmark_saved">Saved to bookmarks</string>
     <string name="msg_no_bookmarks">No bookmarks yet</string>
     <string name="msg_downloads_not_available">Downloads page is not available on this device</string>
@@ -98,7 +119,6 @@
 
     <string name="setting_ad_blocker">Ad blocker</string>
     <string name="setting_javascript">JavaScript enabled</string>
-    <string name="setting_desktop_mode">Desktop mode</string>
 
     <string name="nav_home">HOME</string>
     <string name="nav_history">HISTORY</string>

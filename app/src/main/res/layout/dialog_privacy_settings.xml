@@ -18,11 +18,5 @@
         android:layout_marginTop="8dp"
         android:text="@string/setting_javascript" />
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/switchDesktopMode"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:text="@string/setting_desktop_mode" />
 
 </LinearLayout>

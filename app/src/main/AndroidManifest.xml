@@ -9,6 +9,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Horizon">
         <activity
+            android:name=".ImageViewerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".SavedSitesActivity"
+            android:exported="false" />
+        <activity
             android:name=".DownloadsActivity"
             android:exported="false" />
         <activity

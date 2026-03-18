@@ -66,22 +66,14 @@ class SettingsActivity : AppCompatActivity() {
 
         val adSwitch = view.findViewById<SwitchMaterial>(R.id.switchAdBlocker)
         val jsSwitch = view.findViewById<SwitchMaterial>(R.id.switchJavascript)
-        val desktopSwitch = view.findViewById<SwitchMaterial>(R.id.switchDesktopMode)
-
         adSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
         jsSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_JAVASCRIPT, true)
-        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
-
         adSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(BrowserPreferences.KEY_AD_BLOCKER, checked).apply()
         }
         jsSwitch.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean(BrowserPreferences.KEY_JAVASCRIPT, checked).apply()
         }
-        desktopSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
-        }
-
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_privacy)
             .setView(view)

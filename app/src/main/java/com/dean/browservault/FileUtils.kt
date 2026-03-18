@@ -45,6 +45,29 @@ object FileUtils {
         return destination
     }
 
+
+    fun ensureDownloadsDirectory(context: Context): File {
+        val dir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+            ?: File(context.filesDir, "downloads")
+        if (!dir.exists()) {
+            dir.mkdirs()
+        }
+        return dir
+    }
+
+    fun createUniqueFile(directory: File, suggestedName: String): File {
+        return uniqueDestination(directory, sanitizeName(suggestedName))
+    }
+
+    fun filenameFromUrl(url: String, fallbackPrefix: String = "download"): String {
+        val parsed = Uri.parse(url)
+        val lastSegment = parsed.lastPathSegment.orEmpty().substringAfterLast('/')
+        val candidate = lastSegment.substringBefore('?').ifBlank {
+            "${fallbackPrefix}_${System.currentTimeMillis()}"
+        }
+        return sanitizeName(candidate)
+    }
+
     fun listVaultFiles(context: Context): List<File> {
         val vaultDirectory = ensureVaultDirectory(context)
         return vaultDirectory
