@@ -74,6 +74,15 @@
             app:tint="#C7D0A5" />
     </LinearLayout>
 
+    <com.google.android.material.progressindicator.LinearProgressIndicator
+        android:id="@+id/loadingProgress"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:indeterminate="false"
+        android:visibility="gone"
+        app:indicatorColor="#B8C58A"
+        app:trackColor="#223025" />
+
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"

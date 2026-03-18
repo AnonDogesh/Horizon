@@ -8,7 +8,7 @@ import android.widget.ImageButton
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
@@ -20,6 +20,11 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var inputSearch: EditText
     private lateinit var searchEngineSpinner: Spinner
+
+    private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val url = result.data?.getStringExtra(SavedSitesActivity.EXTRA_SELECTED_URL) ?: return@registerForActivityResult
+        openUrl(url)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -101,7 +106,7 @@ class MainActivity : AppCompatActivity() {
             toast(getString(R.string.msg_home_active))
         }
         findViewById<MaterialButton>(R.id.navHistory).setOnClickListener {
-            showHistoryDialog()
+            openSavedSites(SavedSiteStore.TYPE_HISTORY)
         }
         findViewById<MaterialButton>(R.id.navTabs).setOnClickListener {
             startActivity(Intent(this, TabManagerActivity::class.java))
@@ -122,8 +127,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openUrl(url: String) {
-        rememberHistory(url)
-        TabSessionStore.add(this, url)
+        SavedSiteStore.add(this, SavedSiteStore.TYPE_HISTORY, url)
 
         val lower = url.lowercase(Locale.US)
         if (lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")) {
@@ -158,11 +162,11 @@ class MainActivity : AppCompatActivity() {
 
         content.findViewById<android.view.View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
-            showBookmarksDialog()
+            openSavedSites(SavedSiteStore.TYPE_BOOKMARKS)
         }
         content.findViewById<android.view.View>(R.id.rowHistory).setOnClickListener {
             dialog.dismiss()
-            showHistoryDialog()
+            openSavedSites(SavedSiteStore.TYPE_HISTORY)
         }
         content.findViewById<android.view.View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
@@ -178,60 +182,16 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun showBookmarksDialog() {
-        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toList().sortedDescending()
+    private fun openSavedSites(type: String) {
+        val entries = SavedSiteStore.list(this, type)
         if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_bookmarks))
+            toast(getString(if (type == SavedSiteStore.TYPE_HISTORY) R.string.msg_no_history else R.string.msg_no_bookmarks))
             return
         }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.action_bookmarks)
-            .setItems(entries.toTypedArray()) { _, which ->
-                openUrl(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun rememberHistory(url: String) {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val existing = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toMutableList()
-        existing.remove(url)
-        existing.add(0, url)
-        val trimmed = existing.take(MAX_HISTORY).toSet()
-        prefs.edit().putStringSet(KEY_HISTORY, trimmed).apply()
-    }
-
-    private fun showHistoryDialog() {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toList().sortedDescending()
-
-        if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_history))
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.nav_history)
-            .setItems(entries.toTypedArray()) { _, which ->
-                openUrl(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        savedSitesLauncher.launch(SavedSitesActivity.createIntent(this, type))
     }
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    companion object {
-        private const val HISTORY_PREFS = "home_history"
-        private const val KEY_HISTORY = "history_list"
-        private const val MAX_HISTORY = 20
-
-        private const val BOOKMARK_PREFS = "bookmarks"
-        private const val KEY_BOOKMARKS = "bookmark_list"
     }
 }

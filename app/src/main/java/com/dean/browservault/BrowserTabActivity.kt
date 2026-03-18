@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
@@ -20,11 +21,13 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
 import java.util.Locale
@@ -36,14 +39,20 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private lateinit var buttonReload: ImageButton
     private lateinit var engineSpinner: Spinner
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var loadingProgress: LinearProgressIndicator
     private lateinit var prefs: SharedPreferences
 
     private val adBlocker = AdBlocker()
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
     private var isPageLoading = false
-    private var hasRegisteredTabSession = false
+    private var currentTabUrl: String? = null
     private val promptedHosts = mutableSetOf<String>()
+
+    private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val url = result.data?.getStringExtra(SavedSitesActivity.EXTRA_SELECTED_URL) ?: return@registerForActivityResult
+        loadUrlOrVideo(url)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +65,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         buttonReload = findViewById(R.id.buttonReload)
         engineSpinner = findViewById(R.id.spinnerSearchEngineBrowser)
         swipeRefresh = findViewById(R.id.swipeRefresh)
+        loadingProgress = findViewById(R.id.loadingProgress)
 
         setupSearchEngineSpinner()
         configureWebView()
@@ -131,6 +141,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             displayZoomControls = false
         }
 
+        webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                loadingProgress.progress = newProgress
+                loadingProgress.visibility = if (newProgress in 0..99) View.VISIBLE else View.GONE
+            }
+        }
+
         webView.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(
                 view: WebView?,
@@ -159,6 +177,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
+                loadingProgress.progress = 0
+                loadingProgress.visibility = View.VISIBLE
                 updateReloadButton()
             }
 
@@ -166,15 +186,13 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 super.onPageFinished(view, url)
                 isPageLoading = false
                 swipeRefresh.isRefreshing = false
+                loadingProgress.visibility = View.GONE
                 updateReloadButton()
 
                 if (!url.isNullOrBlank()) {
                     searchInput.setText(url)
-                    rememberHistory(url)
-                    if (!hasRegisteredTabSession) {
-                        TabSessionStore.add(this@BrowserTabActivity, url)
-                        hasRegisteredTabSession = true
-                    }
+                    SavedSiteStore.add(this@BrowserTabActivity, SavedSiteStore.TYPE_HISTORY, url)
+                    syncTabSession(url)
                     maybeHandleCredentialPrompt(url)
                 }
             }
@@ -187,9 +205,10 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 webView.stopLoading()
                 isPageLoading = false
                 swipeRefresh.isRefreshing = false
+                loadingProgress.visibility = View.GONE
                 updateReloadButton()
             } else {
-                webView.reload()
+                reloadCurrentPage()
             }
         }
 
@@ -210,7 +229,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun setupSwipeRefresh() {
         swipeRefresh.setColorSchemeColors(Color.parseColor("#B8C58A"))
         swipeRefresh.setOnRefreshListener {
-            webView.reload()
+            reloadCurrentPage()
         }
     }
 
@@ -344,7 +363,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowBookmarks).setOnClickListener {
             dialog.dismiss()
-            showBookmarksDialog()
+            openSavedSites(SavedSiteStore.TYPE_BOOKMARKS)
         }
         content.findViewById<View>(R.id.rowAddBookmark).apply {
             visibility = View.VISIBLE
@@ -355,7 +374,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
         content.findViewById<View>(R.id.rowHistory).setOnClickListener {
             dialog.dismiss()
-            showHistoryDialog()
+            openSavedSites(SavedSiteStore.TYPE_HISTORY)
         }
         content.findViewById<View>(R.id.rowDownloads).setOnClickListener {
             dialog.dismiss()
@@ -373,61 +392,23 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun addCurrentPageToBookmarks() {
         val url = webView.url ?: return
-        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
-        val list = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toMutableList()
-        list.remove(url)
-        list.add(0, url)
-        prefs.edit().putStringSet(KEY_BOOKMARKS, list.take(MAX_BOOKMARKS).toSet()).apply()
+        SavedSiteStore.add(this, SavedSiteStore.TYPE_BOOKMARKS, url)
         toast(getString(R.string.msg_bookmark_saved))
     }
 
-    private fun showBookmarksDialog() {
-        val prefs = getSharedPreferences(BOOKMARK_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_BOOKMARKS, emptySet()).orEmpty().toList().sortedDescending()
+    private fun openSavedSites(type: String) {
+        val entries = SavedSiteStore.list(this, type)
         if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_bookmarks))
+            toast(getString(if (type == SavedSiteStore.TYPE_HISTORY) R.string.msg_no_history else R.string.msg_no_bookmarks))
             return
         }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.action_bookmarks)
-            .setItems(entries.toTypedArray()) { _, which ->
-                loadUrlOrVideo(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
-    }
-
-    private fun rememberHistory(url: String) {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val existing = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toMutableList()
-        existing.remove(url)
-        existing.add(0, url)
-        prefs.edit().putStringSet(KEY_HISTORY, existing.take(MAX_HISTORY).toSet()).apply()
-    }
-
-    private fun showHistoryDialog() {
-        val prefs = getSharedPreferences(HISTORY_PREFS, MODE_PRIVATE)
-        val entries = prefs.getStringSet(KEY_HISTORY, emptySet()).orEmpty().toList().sortedDescending()
-
-        if (entries.isEmpty()) {
-            toast(getString(R.string.msg_no_history))
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.nav_history)
-            .setItems(entries.toTypedArray()) { _, which ->
-                loadUrlOrVideo(entries[which])
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+        savedSitesLauncher.launch(SavedSitesActivity.createIntent(this, type))
     }
 
     private fun performSearch(query: String) {
         val selectedEngine = SearchEngineManager.selectedEngine(this)
         val url = SearchEngineManager.buildSearchUrl(selectedEngine, query)
-        webView.loadUrl(url)
+        loadWebPage(url)
     }
 
     private fun loadUrlOrVideo(url: String) {
@@ -437,8 +418,43 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                     .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, url)
             )
         } else {
-            webView.loadUrl(url)
+            loadWebPage(url)
         }
+    }
+
+    private fun loadWebPage(url: String) {
+        val headers = buildRequestHeaders()
+        if (headers.isEmpty()) {
+            webView.loadUrl(url)
+        } else {
+            webView.loadUrl(url, headers)
+        }
+    }
+
+    private fun reloadCurrentPage() {
+        val currentUrl = webView.url
+        if (currentUrl.isNullOrBlank()) {
+            webView.reload()
+            return
+        }
+        webView.stopLoading()
+        webView.clearCache(false)
+        loadWebPage(currentUrl)
+    }
+
+    private fun buildRequestHeaders(): Map<String, String> {
+        val userAgent = webView.settings.userAgentString ?: return emptyMap()
+        return mapOf("User-Agent" to userAgent)
+    }
+
+    private fun syncTabSession(url: String) {
+        val previousUrl = currentTabUrl
+        if (previousUrl == null) {
+            TabSessionStore.add(this, url)
+        } else if (previousUrl != url) {
+            TabSessionStore.replace(this, previousUrl, url)
+        }
+        currentTabUrl = url
     }
 
     private fun isVideoUrl(url: String): Boolean {
@@ -463,7 +479,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
 
         if (reloadPage && webView.url != null) {
-            webView.reload()
+            reloadCurrentPage()
         }
     }
 
@@ -474,14 +490,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     companion object {
         const val EXTRA_QUERY = "extra_query"
         const val EXTRA_URL = "extra_url"
-
-        private const val HISTORY_PREFS = "home_history"
-        private const val KEY_HISTORY = "history_list"
-        private const val MAX_HISTORY = 50
-
-        private const val BOOKMARK_PREFS = "bookmarks"
-        private const val KEY_BOOKMARKS = "bookmark_list"
-        private const val MAX_BOOKMARKS = 50
 
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"

@@ -50,9 +50,20 @@
     <string name="action_save">Save</string>
     <string name="msg_credentials_saved">Credentials saved</string>
     <string name="action_downloads">Downloads</string>
+    <string name="title_bookmarks">Bookmarks</string>
+    <string name="title_history">History</string>
     <string name="action_more">More actions</string>
     <string name="action_move_to_vault">Move to vault</string>
     <string name="msg_no_downloads">No downloads found.</string>
+
+    <plurals name="saved_sites_selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="msg_delete_saved_sites_confirm">
+        <item quantity="one">Delete %d website?</item>
+        <item quantity="other">Delete %d websites?</item>
+    </plurals>
 
     <plurals name="downloads_selected_count">
         <item quantity="one">%d selected</item>

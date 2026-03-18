@@ -27,6 +27,14 @@ object TabSessionStore {
         save(context, current.take(MAX_TABS))
     }
 
+    fun replace(context: Context, previousUrl: String, newUrl: String) {
+        val current = list(context).toMutableList()
+        current.remove(previousUrl)
+        current.remove(newUrl)
+        current.add(0, newUrl)
+        save(context, current.take(MAX_TABS))
+    }
+
     fun remove(context: Context, url: String) {
         val current = list(context).toMutableList()
         current.remove(url)
