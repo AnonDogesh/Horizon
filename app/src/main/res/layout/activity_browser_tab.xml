@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E110C">
+    android:background="@color/horizon_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,12 +16,22 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
-            android:background="#171D15"
+            android:background="@color/horizon_surface"
             android:gravity="center_vertical"
             android:minHeight="44dp"
             android:orientation="horizontal"
             android:paddingStart="6dp"
             android:paddingEnd="6dp">
+
+            <Spinner
+                android:id="@+id/spinnerSearchEngineBrowser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="@color/horizon_surface_alt"
+                android:minWidth="72dp"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp" />
 
             <EditText
                 android:id="@+id/searchInput"
@@ -34,8 +44,8 @@
                 android:inputType="text"
                 android:maxLines="1"
                 android:padding="0dp"
-                android:textColor="#E6ECD7"
-                android:textColorHint="#8E9980"
+                android:textColor="@color/horizon_text_primary"
+                android:textColorHint="@color/horizon_text_secondary"
                 android:textSize="14sp" />
 
             <ImageButton
@@ -45,17 +55,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_clear"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
-                app:tint="#C7D0A5" />
-
-            <Spinner
-                android:id="@+id/spinnerSearchEngineBrowser"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:background="#171D15"
-                android:minWidth="72dp"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/buttonReload"
@@ -65,7 +65,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_refresh"
                 android:src="@android:drawable/ic_popup_sync"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/buttonSearch"
@@ -75,7 +75,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_search"
                 android:src="@android:drawable/ic_menu_search"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
         </LinearLayout>
 
         <com.google.android.material.progressindicator.LinearProgressIndicator
@@ -84,8 +84,8 @@
             android:layout_height="2dp"
             android:indeterminate="false"
             android:visibility="gone"
-            app:indicatorColor="#B8C58A"
-            app:trackColor="#223025" />
+            app:indicatorColor="@color/horizon_accent"
+            app:trackColor="#D7E7FA" />
 
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipeRefresh"
@@ -102,7 +102,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="#161C13"
+            android:background="@color/horizon_surface"
             android:gravity="center"
             android:orientation="horizontal"
             android:padding="8dp">
@@ -115,7 +115,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_back"
                 android:src="@android:drawable/ic_media_previous"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/bottomForward"
@@ -125,7 +125,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_forward"
                 android:src="@android:drawable/ic_media_next"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/bottomNewTab"
@@ -135,7 +135,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_new_tab"
                 android:src="@android:drawable/ic_input_add"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/bottomTabs"
@@ -145,7 +145,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_tabs"
                 android:src="@android:drawable/ic_menu_agenda"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
 
             <ImageButton
                 android:id="@+id/bottomMenu"
@@ -155,7 +155,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_menu"
                 android:src="@android:drawable/ic_menu_sort_by_size"
-                app:tint="#C7D0A5" />
+                app:tint="@color/horizon_accent_dark" />
         </LinearLayout>
     </LinearLayout>
 
@@ -168,7 +168,7 @@
         android:layout_marginBottom="88dp"
         android:contentDescription="@string/action_watch"
         android:src="@android:drawable/ic_media_play"
-        app:backgroundTint="#2A3126"
-        app:tint="#AAB58A" />
+        app:backgroundTint="@color/horizon_accent"
+        app:tint="@android:color/white" />
 
 </FrameLayout>

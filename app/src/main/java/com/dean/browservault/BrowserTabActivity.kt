@@ -28,6 +28,7 @@ import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.PopupWindow
+import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -41,8 +42,10 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
+import org.json.JSONArray
 import java.io.ByteArrayInputStream
 import java.io.FileOutputStream
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
@@ -67,6 +70,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var lastTouchRawX = 0f
     private var lastTouchRawY = 0f
     private var currentFloatingMenu: PopupWindow? = null
+    private val detectedVideoUrls = linkedSetOf<String>()
     private val promptedHosts = mutableSetOf<String>()
 
     private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -184,7 +188,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 request: WebResourceRequest
             ): WebResourceResponse? {
                 val requestUrl = request.url.toString()
-                return if (isAdBlockEnabled && adBlocker.isAdUrl(requestUrl)) {
+                val isAdRequest = isAdBlockEnabled && adBlocker.isAdUrl(requestUrl)
+                return if (isAdRequest) {
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
                     super.shouldInterceptRequest(view, request)
@@ -212,6 +217,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
                 currentPlayingVideoUrl = null
+                detectedVideoUrls.clear()
                 updateVideoActionButton()
                 loadingProgress.progress = 0
                 loadingProgress.visibility = View.VISIBLE
@@ -232,6 +238,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                     maybeHandleCredentialPrompt(url)
                     injectVideoObserver()
                     refreshPlayingVideoStateFromPage()
+                    collectVideoCandidatesFromPage()
                 }
             }
         }
@@ -298,16 +305,12 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun setupVideoActionButton() {
         videoActionButton.setOnClickListener {
-            if (currentPlayingVideoUrl.isNullOrBlank()) {
-                toast(getString(R.string.msg_no_active_video))
-            } else {
-                showVideoMenu(videoActionButton)
-            }
+            showVideoCandidatesMenu(videoActionButton)
         }
     }
 
     private fun updateVideoActionButton() {
-        val hasVideo = !currentPlayingVideoUrl.isNullOrBlank()
+        val hasVideo = !resolveActionableVideoUrl().isNullOrBlank()
         videoActionButton.alpha = if (hasVideo) 1f else 0.45f
         videoActionButton.backgroundTintList = ColorStateList.valueOf(
             Color.parseColor(if (hasVideo) "#C7D0A5" else "#2A3126")
@@ -333,23 +336,57 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         )
     }
 
-    private fun showVideoMenu(anchor: View) {
-        showFloatingGridMenu(
-            actions = listOf(
-                MenuAction(R.string.action_watch) { watchCurrentVideo() },
-                MenuAction(R.string.action_download) {
-                    val url = currentPlayingVideoUrl
-                    if (url.isNullOrBlank()) {
-                        toast(getString(R.string.msg_no_active_video))
-                    } else {
-                        downloadMedia(url)
-                    }
-                }
-            ),
-            rawX = null,
-            rawY = null,
-            anchorView = anchor
-        )
+    private fun showVideoCandidatesMenu(anchor: View) {
+        val loadingPopup = showVideoLoadingPopup(anchor)
+        buildVideoCandidates { candidates ->
+            loadingPopup.dismiss()
+            if (candidates.isEmpty()) {
+                toast(getString(R.string.msg_no_active_video))
+                return@buildVideoCandidates
+            }
+            showVideoCandidatePopup(anchor, candidates)
+        }
+    }
+
+    private fun showVideoLoadingPopup(anchor: View): PopupWindow {
+        currentFloatingMenu?.dismiss()
+        val loadingView = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(14).toFloat()
+                setColor(Color.parseColor("#1B2218"))
+                setStroke(dp(1), Color.parseColor("#2F3A2A"))
+            }
+            addView(android.widget.ProgressBar(this@BrowserTabActivity).apply {
+                isIndeterminate = true
+            })
+            addView(TextView(this@BrowserTabActivity).apply {
+                text = getString(R.string.msg_loading_video_candidates)
+                setTextColor(Color.parseColor("#E6ECD7"))
+                setPadding(dp(10), 0, 0, 0)
+            })
+        }
+
+        val popup = PopupWindow(
+            loadingView,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            false
+        ).apply {
+            isOutsideTouchable = false
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        loadingView.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val anchorLocation = IntArray(2).also { anchor.getLocationOnScreen(it) }
+        val x = ((resources.displayMetrics.widthPixels - loadingView.measuredWidth) / 2).coerceAtLeast(dp(8))
+        val y = (anchorLocation[1] - loadingView.measuredHeight - dp(8)).coerceAtLeast(dp(8))
+        popup.showAtLocation(window.decorView, Gravity.NO_GRAVITY, x, y)
+        currentFloatingMenu = popup
+        return popup
     }
 
     private fun showFloatingGridMenu(
@@ -407,7 +444,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun createFloatingMenuView(actions: List<MenuAction>): View {
-        val background = GradientDrawable().apply {
+        val menuBackground = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dp(18).toFloat()
             setColor(Color.parseColor("#1B2218"))
@@ -416,7 +453,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = background
+            background = menuBackground
             elevation = dp(12).toFloat()
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
@@ -448,14 +485,149 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         return container
     }
 
-    private fun watchCurrentVideo() {
-        val url = currentPlayingVideoUrl
-        if (url.isNullOrBlank() || !isDirectPlayableMediaUrl(url)) {
-            toast(getString(R.string.msg_video_action_unavailable))
-            return
+    private fun buildVideoCandidates(onReady: (List<VideoCandidate>) -> Unit) {
+        collectVideoCandidatesFromPage {
+            val immediate = currentPlayingVideoUrl?.takeIf { it.isNotBlank() }
+            if (!immediate.isNullOrBlank()) {
+                synchronized(detectedVideoUrls) { detectedVideoUrls.add(immediate) }
+            }
+
+            Thread {
+                val urls = synchronized(detectedVideoUrls) { detectedVideoUrls.toList() }
+                val candidates = urls.mapNotNull { url -> buildVideoCandidate(url) }
+                runOnUiThread { onReady(candidates) }
+            }.start()
         }
-        pauseWebVideos()
-        openNativeVideoPlayer(url)
+    }
+
+    private fun buildVideoCandidate(url: String): VideoCandidate? {
+        if (!isDirectPlayableMediaUrl(url)) return null
+        val size = probeContentLength(url)
+        val contentType = probeContentType(url)
+        if (!isLikelyPlayableVideo(url, contentType)) return null
+        return VideoCandidate(url = url, sizeBytes = size)
+    }
+
+    private fun showVideoCandidatePopup(anchor: View, candidates: List<VideoCandidate>) {
+        currentFloatingMenu?.dismiss()
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(10), dp(10), dp(10), dp(10))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dp(16).toFloat()
+                setColor(Color.parseColor("#1B2218"))
+                setStroke(dp(1), Color.parseColor("#2F3A2A"))
+            }
+        }
+
+        val scroll = ScrollView(this).apply {
+            addView(content)
+        }
+
+        candidates.forEach { candidate ->
+            content.addView(createVideoCandidateRow(candidate))
+        }
+
+        val popup = PopupWindow(
+            scroll,
+            (resources.displayMetrics.widthPixels * 0.92f).toInt(),
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        scroll.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
+        val popupHeight = scroll.measuredHeight.coerceAtMost((resources.displayMetrics.heightPixels * 0.65f).toInt())
+        popup.height = popupHeight
+
+        val anchorLocation = IntArray(2).also { anchor.getLocationOnScreen(it) }
+        val x = (resources.displayMetrics.widthPixels - popup.width) / 2
+        val y = (anchorLocation[1] - popupHeight - dp(8)).coerceAtLeast(dp(8))
+        popup.showAtLocation(window.decorView, Gravity.NO_GRAVITY, x, y)
+        currentFloatingMenu = popup
+    }
+
+    private fun createVideoCandidateRow(candidate: VideoCandidate): View {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }
+
+        val title = TextView(this).apply {
+            text = FileUtils.filenameFromUrl(candidate.url, "video")
+            setTextColor(Color.parseColor("#E6ECD7"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        }
+        val subtitle = TextView(this).apply {
+            text = candidate.sizeBytes?.let(::formatFileSize) ?: getString(R.string.label_size_unknown)
+            setTextColor(Color.parseColor("#9FAF89"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+        }
+
+        val play = MaterialButton(this).apply {
+            text = getString(R.string.action_watch)
+            setOnClickListener {
+                openNativeVideoPlayer(candidate.url)
+                currentFloatingMenu?.dismiss()
+            }
+        }
+        val download = MaterialButton(this).apply {
+            text = getString(R.string.action_download)
+            setOnClickListener {
+                currentFloatingMenu?.dismiss()
+                downloadMedia(candidate.url)
+            }
+        }
+
+        controls.addView(play)
+        controls.addView(download)
+        container.addView(title)
+        container.addView(subtitle)
+        container.addView(controls)
+        container.addView(View(this).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1))
+            setBackgroundColor(Color.parseColor("#2F3A2A"))
+        })
+        return container
+    }
+
+    private fun probeContentLength(url: String): Long? {
+        return runCatching {
+            val connection = URL(url).openConnection() as? HttpURLConnection ?: return null
+            connection.instanceFollowRedirects = true
+            connection.connectTimeout = 4000
+            connection.readTimeout = 4000
+            connection.requestMethod = "HEAD"
+            connection.connect()
+            val size = connection.contentLengthLong.takeIf { it > 0 }
+            connection.disconnect()
+            size
+        }.getOrNull() ?: runCatching {
+            val connection = URL(url).openConnection().apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+            }
+            connection.contentLengthLong.takeIf { it > 0 }
+        }.getOrNull()
+    }
+
+    private fun formatFileSize(bytes: Long): String {
+        if (bytes < 1024) return "$bytes B"
+        val kb = bytes / 1024.0
+        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb)
+        val mb = kb / 1024.0
+        if (mb < 1024) return String.format(Locale.US, "%.1f MB", mb)
+        val gb = mb / 1024.0
+        return String.format(Locale.US, "%.2f GB", gb)
     }
 
     private fun openNativeVideoPlayer(url: String) {
@@ -577,8 +749,15 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             (function() {
               var bridge = window.$JS_BRIDGE_NAME;
               if (!bridge) return;
-              function notify(video, state) {
+              function resolveSrc(video) {
+                if (!video) return '';
                 var src = video.currentSrc || video.src || '';
+                if (src) return src;
+                var source = video.querySelector('source[src]');
+                return source ? (source.src || source.getAttribute('src') || '') : '';
+              }
+              function notify(video, state) {
+                var src = resolveSrc(video);
                 bridge.onVideoState(src, state);
               }
               function attach(video) {
@@ -612,28 +791,42 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
               var video = Array.from(document.querySelectorAll('video')).find(function(item) {
                 return !item.paused && !item.ended;
               });
-              return video ? (video.currentSrc || video.src || '') : '';
+              if (!video) return '';
+              var src = video.currentSrc || video.src || '';
+              if (src) return src;
+              var source = video.querySelector('source[src]');
+              return source ? (source.src || source.getAttribute('src') || '') : '';
             })();
             """.trimIndent()
         ) { rawValue ->
             currentPlayingVideoUrl = parseJavascriptString(rawValue)
+            currentPlayingVideoUrl?.let { recordDetectedMediaUrl(it) }
             updateVideoActionButton()
         }
     }
 
-    private fun pauseWebVideos() {
+    private fun collectVideoCandidatesFromPage(onComplete: (() -> Unit)? = null) {
         webView.evaluateJavascript(
             """
             (function() {
+              var urls = [];
               document.querySelectorAll('video').forEach(function(video) {
-                try { video.pause(); } catch (e) {}
+                var direct = video.currentSrc || video.src || '';
+                if (direct) urls.push(direct);
+                video.querySelectorAll('source[src]').forEach(function(source) {
+                  var src = source.src || source.getAttribute('src') || '';
+                  if (src) urls.push(src);
+                });
               });
+              return JSON.stringify(Array.from(new Set(urls)));
             })();
-            """.trimIndent(),
-            null
-        )
-        currentPlayingVideoUrl = null
-        updateVideoActionButton()
+            """.trimIndent()
+        ) { rawValue ->
+            parseJavascriptArray(rawValue)
+                .filter { isDirectPlayableMediaUrl(it) }
+                .forEach { url -> recordDetectedMediaUrl(url) }
+            onComplete?.invoke()
+        }
     }
 
     private fun parseJavascriptString(rawValue: String?): String? {
@@ -641,9 +834,21 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         if (value.isBlank() || value == "null" || value == "\"\"") return null
         return value.removeSurrounding("\"")
             .replace("\\/", "/")
+            .replace("\\\"", "\"")
             .replace("\\u003C", "<")
             .replace("\\n", "")
             .takeIf { it.isNotBlank() }
+    }
+
+    private fun parseJavascriptArray(rawValue: String?): List<String> {
+        val clean = parseJavascriptString(rawValue).orEmpty().trim()
+        if (clean.isBlank()) return emptyList()
+        return runCatching {
+            val jsonArray = JSONArray(clean)
+            List(jsonArray.length()) { idx -> jsonArray.optString(idx).orEmpty() }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+        }.getOrElse { emptyList() }
     }
 
     private fun looksLikeAuthPage(url: String): Boolean {
@@ -823,18 +1028,66 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun isVideoUrl(url: String): Boolean {
-        val lower = url.lowercase(Locale.US)
-        return lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")
+        return looksLikeMediaAssetUrl(url)
     }
 
     private fun isDirectPlayableMediaUrl(url: String): Boolean {
         if (url.startsWith("blob:")) return false
-        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https", "content", "file")
+        val scheme = Uri.parse(url).scheme.orEmpty().lowercase(Locale.US)
+        if (scheme !in setOf("http", "https", "content", "file")) return false
+        return looksLikeMediaAssetUrl(url)
     }
 
     private fun isDownloadableMediaUrl(url: String): Boolean {
         if (url.startsWith("blob:")) return false
-        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https")
+        val scheme = Uri.parse(url).scheme.orEmpty().lowercase(Locale.US)
+        if (scheme !in setOf("http", "https")) return false
+        return looksLikeMediaAssetUrl(url)
+    }
+
+    private fun resolveActionableVideoUrl(): String? {
+        val primary = currentPlayingVideoUrl?.takeIf { isDirectPlayableMediaUrl(it) }
+        if (!primary.isNullOrBlank()) return primary
+        return synchronized(detectedVideoUrls) {
+            detectedVideoUrls.firstOrNull { isDirectPlayableMediaUrl(it) }
+        }
+    }
+
+    private fun recordDetectedMediaUrl(url: String) {
+        if (adBlocker.isAdUrl(url)) return
+        if (!isDirectPlayableMediaUrl(url)) return
+        synchronized(detectedVideoUrls) {
+            detectedVideoUrls.add(url)
+        }
+        runOnUiThread { updateVideoActionButton() }
+    }
+
+    private fun looksLikeMediaAssetUrl(url: String): Boolean {
+        val sanitized = url.substringBefore('#').substringBefore('?').lowercase(Locale.US)
+        return sanitized.endsWith(".mp4") ||
+            sanitized.endsWith(".m3u8") ||
+            sanitized.endsWith(".webm") ||
+            sanitized.endsWith(".mkv") ||
+            sanitized.endsWith(".m4v") ||
+            sanitized.endsWith(".mov") ||
+            sanitized.endsWith(".mpd")
+    }
+
+    private fun probeContentType(url: String): String? {
+        return runCatching {
+            val connection = URL(url).openConnection().apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+            }
+            connection.getHeaderField("Content-Type")?.lowercase(Locale.US)
+        }.getOrNull()
+    }
+
+    private fun isLikelyPlayableVideo(url: String, contentType: String?): Boolean {
+        if (contentType.isNullOrBlank()) return looksLikeMediaAssetUrl(url)
+        return contentType.startsWith("video/") ||
+            contentType.contains("application/vnd.apple.mpegurl") ||
+            contentType.contains("application/dash+xml")
     }
 
     @Suppress("SetJavaScriptEnabled")
@@ -872,12 +1125,18 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         val onClick: () -> Unit
     )
 
+    private data class VideoCandidate(
+        val url: String,
+        val sizeBytes: Long?
+    )
+
     private inner class BrowserJsBridge {
         @JavascriptInterface
         fun onVideoState(url: String?, state: String?) {
             runOnUiThread {
                 if (state == "play") {
                     currentPlayingVideoUrl = url?.takeIf { it.isNotBlank() }
+                    currentPlayingVideoUrl?.let { recordDetectedMediaUrl(it) }
                     updateVideoActionButton()
                 } else {
                     refreshPlayingVideoStateFromPage()
