@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#0E110C"
+    android:background="@color/horizon_bg"
     android:orientation="vertical">
 
     <LinearLayout
@@ -27,7 +27,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/app_brand"
-                android:textColor="#E6ECD7"
+                android:textColor="@color/horizon_text_primary"
                 android:textSize="28sp"
                 android:textStyle="bold" />
 
@@ -38,7 +38,7 @@
                 android:background="@android:color/transparent"
                 android:contentDescription="@string/action_settings"
                 android:src="@android:drawable/ic_menu_manage"
-                app:tint="#D8E2BE" />
+                app:tint="@color/horizon_accent_dark" />
         </LinearLayout>
 
         <TextView
@@ -47,7 +47,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="@string/home_headline"
-            android:textColor="#C7D0A5"
+            android:textColor="@color/horizon_text_secondary"
             android:textSize="46sp"
             android:textStyle="bold" />
 
@@ -55,7 +55,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
-            android:background="#171D15"
+            android:background="@color/horizon_surface"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="10dp">
@@ -71,15 +71,15 @@
                 android:inputType="textUri"
                 android:paddingStart="8dp"
                 android:paddingEnd="8dp"
-                android:textColor="#DCE5C8"
-                android:textColorHint="#758266" />
+                android:textColor="@color/horizon_text_primary"
+                android:textColorHint="@color/horizon_text_secondary" />
 
             <Spinner
                 android:id="@+id/spinnerSearchEngineHome"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:background="#2A3126"
+                android:background="@color/horizon_surface_alt"
                 android:paddingStart="6dp"
                 android:paddingEnd="6dp" />
 
@@ -116,18 +116,18 @@
                         android:id="@+id/shortcutChatGpt"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
-                        android:background="#1B2218"
+                        android:background="@color/horizon_surface_alt"
                         android:contentDescription="ChatGPT"
                         android:padding="12dp"
                         android:src="@android:drawable/ic_menu_info_details"
-                        android:tint="#D8E2BE" />
+                        android:tint="@color/horizon_accent_dark" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="ChatGPT"
-                        android:textColor="#C7D0A5"
+                        android:textColor="@color/horizon_text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -142,18 +142,18 @@
                         android:id="@+id/shortcutYoutube"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
-                        android:background="#1B2218"
+                        android:background="@color/horizon_surface_alt"
                         android:contentDescription="YouTube"
                         android:padding="12dp"
                         android:src="@android:drawable/ic_media_play"
-                        android:tint="#D8E2BE" />
+                        android:tint="@color/horizon_accent_dark" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="YouTube"
-                        android:textColor="#C7D0A5"
+                        android:textColor="@color/horizon_text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -168,18 +168,18 @@
                         android:id="@+id/shortcutX"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
-                        android:background="#1B2218"
+                        android:background="@color/horizon_surface_alt"
                         android:contentDescription="X"
                         android:padding="12dp"
                         android:src="@android:drawable/ic_menu_share"
-                        android:tint="#D8E2BE" />
+                        android:tint="@color/horizon_accent_dark" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="X"
-                        android:textColor="#C7D0A5"
+                        android:textColor="@color/horizon_text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
 
@@ -194,18 +194,18 @@
                         android:id="@+id/shortcutInstagram"
                         android:layout_width="58dp"
                         android:layout_height="58dp"
-                        android:background="#1B2218"
+                        android:background="@color/horizon_surface_alt"
                         android:contentDescription="Instagram"
                         android:padding="12dp"
                         android:src="@android:drawable/ic_menu_camera"
-                        android:tint="#D8E2BE" />
+                        android:tint="@color/horizon_accent_dark" />
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:text="Instagram"
-                        android:textColor="#C7D0A5"
+                        android:textColor="@color/horizon_text_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
             </LinearLayout>
@@ -223,7 +223,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/home_for_you"
-                android:textColor="#E6ECD7"
+                android:textColor="@color/horizon_text_primary"
                 android:textSize="26sp"
                 android:textStyle="bold" />
 
@@ -232,7 +232,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="@string/action_customize_feed"
-                android:textColor="#C7D0A5"
+                android:textColor="@color/horizon_accent_dark"
                 android:textSize="14sp" />
         </LinearLayout>
 
@@ -252,7 +252,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="170dp"
                     android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#141D12"
+                    app:cardBackgroundColor="@color/horizon_surface"
                     app:cardCornerRadius="16dp">
 
                     <TextView
@@ -262,7 +262,7 @@
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_primary"
-                        android:textColor="#E6ECD7"
+                        android:textColor="@color/horizon_text_primary"
                         android:textSize="28sp"
                         android:textStyle="bold" />
                 </com.google.android.material.card.MaterialCardView>
@@ -272,7 +272,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="140dp"
                     android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#12302B"
+                    app:cardBackgroundColor="@color/horizon_surface_alt"
                     app:cardCornerRadius="16dp">
 
                     <TextView
@@ -282,7 +282,7 @@
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_secondary"
-                        android:textColor="#E6ECD7"
+                        android:textColor="@color/horizon_text_primary"
                         android:textSize="23sp"
                         android:textStyle="bold" />
                 </com.google.android.material.card.MaterialCardView>
@@ -292,7 +292,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="140dp"
                     android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#142417"
+                    app:cardBackgroundColor="@color/horizon_surface"
                     app:cardCornerRadius="16dp">
 
                     <TextView
@@ -302,7 +302,7 @@
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_tertiary"
-                        android:textColor="#E6ECD7"
+                        android:textColor="@color/horizon_text_primary"
                         android:textSize="23sp"
                         android:textStyle="bold" />
                 </com.google.android.material.card.MaterialCardView>
@@ -312,7 +312,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="140dp"
                     android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#1A2435"
+                    app:cardBackgroundColor="@color/horizon_surface_alt"
                     app:cardCornerRadius="16dp">
 
                     <TextView
@@ -322,7 +322,7 @@
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_quaternary"
-                        android:textColor="#E6ECD7"
+                        android:textColor="@color/horizon_text_primary"
                         android:textSize="23sp"
                         android:textStyle="bold" />
                 </com.google.android.material.card.MaterialCardView>
@@ -332,7 +332,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="140dp"
                     android:layout_marginBottom="12dp"
-                    app:cardBackgroundColor="#302614"
+                    app:cardBackgroundColor="@color/horizon_surface"
                     app:cardCornerRadius="16dp">
 
                     <TextView
@@ -342,7 +342,7 @@
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_quinary"
-                        android:textColor="#E6ECD7"
+                        android:textColor="@color/horizon_text_primary"
                         android:textSize="23sp"
                         android:textStyle="bold" />
                 </com.google.android.material.card.MaterialCardView>
@@ -353,7 +353,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="#141A11"
+        android:background="@color/horizon_surface"
         android:gravity="center"
         android:orientation="horizontal"
         android:padding="10dp">

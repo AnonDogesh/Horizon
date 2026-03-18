@@ -67,8 +67,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var isDesktopMode = false
     private var currentTabUrl: String? = null
     private var currentPlayingVideoUrl: String? = null
-    @Volatile
-    private var lastDetectedMediaUrl: String? = null
     private var lastTouchRawX = 0f
     private var lastTouchRawY = 0f
     private var currentFloatingMenu: PopupWindow? = null
@@ -191,9 +189,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             ): WebResourceResponse? {
                 val requestUrl = request.url.toString()
                 val isAdRequest = isAdBlockEnabled && adBlocker.isAdUrl(requestUrl)
-                if (!isAdRequest && isLikelyMediaRequest(request)) {
-                    recordDetectedMediaUrl(requestUrl)
-                }
                 return if (isAdRequest) {
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
@@ -222,7 +217,6 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
                 currentPlayingVideoUrl = null
-                lastDetectedMediaUrl = null
                 detectedVideoUrls.clear()
                 updateVideoActionButton()
                 loadingProgress.progress = 0
@@ -493,24 +487,25 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun buildVideoCandidates(onReady: (List<VideoCandidate>) -> Unit) {
         collectVideoCandidatesFromPage {
+            val immediate = currentPlayingVideoUrl?.takeIf { it.isNotBlank() }
+            if (!immediate.isNullOrBlank()) {
+                synchronized(detectedVideoUrls) { detectedVideoUrls.add(immediate) }
+            }
+
             Thread {
-                val fallback = resolveActionableVideoUrl()
-                if (!fallback.isNullOrBlank()) {
-                    synchronized(detectedVideoUrls) { detectedVideoUrls.add(fallback) }
-                }
-
-                val urls = synchronized(detectedVideoUrls) {
-                    detectedVideoUrls
-                        .filter { isDirectPlayableMediaUrl(it) }
-                        .distinct()
-                }
-
-                val candidates = urls.map { url ->
-                    VideoCandidate(url = url, sizeBytes = probeContentLength(url))
-                }
+                val urls = synchronized(detectedVideoUrls) { detectedVideoUrls.toList() }
+                val candidates = urls.mapNotNull { url -> buildVideoCandidate(url) }
                 runOnUiThread { onReady(candidates) }
             }.start()
         }
+    }
+
+    private fun buildVideoCandidate(url: String): VideoCandidate? {
+        if (!isDirectPlayableMediaUrl(url)) return null
+        val size = probeContentLength(url)
+        val contentType = probeContentType(url)
+        if (!isLikelyPlayableVideo(url, contentType)) return null
+        return VideoCandidate(url = url, sizeBytes = size)
     }
 
     private fun showVideoCandidatePopup(anchor: View, candidates: List<VideoCandidate>) {
@@ -1053,23 +1048,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun resolveActionableVideoUrl(): String? {
         val primary = currentPlayingVideoUrl?.takeIf { isDirectPlayableMediaUrl(it) }
         if (!primary.isNullOrBlank()) return primary
-        return lastDetectedMediaUrl?.takeIf { isDirectPlayableMediaUrl(it) }
-    }
-
-    private fun isLikelyMediaRequest(request: WebResourceRequest): Boolean {
-        val requestUrl = request.url.toString()
-        if (looksLikeMediaAssetUrl(requestUrl)) return true
-        val accept = request.requestHeaders["Accept"].orEmpty().lowercase(Locale.US)
-        return accept.contains("video/") ||
-            accept.contains("application/vnd.apple.mpegurl") ||
-            accept.contains("application/dash+xml")
+        return synchronized(detectedVideoUrls) {
+            detectedVideoUrls.firstOrNull { isDirectPlayableMediaUrl(it) }
+        }
     }
 
     private fun recordDetectedMediaUrl(url: String) {
         if (adBlocker.isAdUrl(url)) return
         if (!isDirectPlayableMediaUrl(url)) return
-        if (url == lastDetectedMediaUrl) return
-        lastDetectedMediaUrl = url
         synchronized(detectedVideoUrls) {
             detectedVideoUrls.add(url)
         }
@@ -1084,8 +1070,24 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             sanitized.endsWith(".mkv") ||
             sanitized.endsWith(".m4v") ||
             sanitized.endsWith(".mov") ||
-            sanitized.endsWith(".mpd") ||
-            sanitized.endsWith(".ts")
+            sanitized.endsWith(".mpd")
+    }
+
+    private fun probeContentType(url: String): String? {
+        return runCatching {
+            val connection = URL(url).openConnection().apply {
+                connectTimeout = 4000
+                readTimeout = 4000
+            }
+            connection.getHeaderField("Content-Type")?.lowercase(Locale.US)
+        }.getOrNull()
+    }
+
+    private fun isLikelyPlayableVideo(url: String, contentType: String?): Boolean {
+        if (contentType.isNullOrBlank()) return looksLikeMediaAssetUrl(url)
+        return contentType.startsWith("video/") ||
+            contentType.contains("application/vnd.apple.mpegurl") ||
+            contentType.contains("application/dash+xml")
     }
 
     @Suppress("SetJavaScriptEnabled")
@@ -1134,6 +1136,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             runOnUiThread {
                 if (state == "play") {
                     currentPlayingVideoUrl = url?.takeIf { it.isNotBlank() }
+                    currentPlayingVideoUrl?.let { recordDetectedMediaUrl(it) }
                     updateVideoActionButton()
                 } else {
                     refreshPlayingVideoStateFromPage()
