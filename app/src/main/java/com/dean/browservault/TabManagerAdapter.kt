@@ -12,21 +12,21 @@ import androidx.recyclerview.widget.RecyclerView
 import java.util.Locale
 
 class TabManagerAdapter(
-    private val onTabClick: (String) -> Unit,
-    private val onCloseTab: (String) -> Unit,
+    private val onTabClick: (TabSession) -> Unit,
+    private val onCloseTab: (TabSession) -> Unit,
     private val onNewTabClick: () -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
-    private val urls = mutableListOf<String>()
+    private val sessions = mutableListOf<TabSession>()
 
-    fun submitTabs(values: List<String>) {
-        urls.clear()
-        urls.addAll(values)
+    fun submitTabs(values: List<TabSession>) {
+        sessions.clear()
+        sessions.addAll(values)
         notifyDataSetChanged()
     }
 
     override fun getItemViewType(position: Int): Int {
-        return if (position < urls.size) VIEW_TAB else VIEW_NEW_TAB
+        return if (position < sessions.size) VIEW_TAB else VIEW_NEW_TAB
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
@@ -40,11 +40,11 @@ class TabManagerAdapter(
         }
     }
 
-    override fun getItemCount(): Int = urls.size + 1
+    override fun getItemCount(): Int = sessions.size + 1
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
         if (holder is TabViewHolder) {
-            holder.bind(urls[position], onTabClick, onCloseTab)
+            holder.bind(sessions[position], onTabClick, onCloseTab)
         } else if (holder is NewTabViewHolder) {
             holder.itemView.setOnClickListener { onNewTabClick() }
         }
@@ -60,19 +60,19 @@ class TabManagerAdapter(
         private val textSubtitle: TextView = itemView.findViewById(R.id.textSubtitle)
         private val closeButton: ImageButton = itemView.findViewById(R.id.buttonCloseTab)
 
-        fun bind(url: String, onClick: (String) -> Unit, onClose: (String) -> Unit) {
-            val host = Uri.parse(url).host.orEmpty().ifBlank { url }
+        fun bind(session: TabSession, onClick: (TabSession) -> Unit, onClose: (TabSession) -> Unit) {
+            val host = Uri.parse(session.url).host.orEmpty().ifBlank { session.url }
             val title = host.substringBefore('.').replaceFirstChar {
                 if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString()
             }
 
             textInitial.text = title.take(1).ifBlank { "?" }
             textTitle.text = title
-            textSubtitle.text = host
+            textSubtitle.text = if (session.desktopMode) "$host • ${itemView.context.getString(R.string.action_desktop_site)}" else host
             previewTint.setBackgroundColor(colorFromHost(host))
 
-            itemView.setOnClickListener { onClick(url) }
-            closeButton.setOnClickListener { onClose(url) }
+            itemView.setOnClickListener { onClick(session) }
+            closeButton.setOnClickListener { onClose(session) }
         }
 
         private fun colorFromHost(host: String): Int {

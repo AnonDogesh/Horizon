@@ -18,6 +18,7 @@ import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.Spinner
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -30,6 +31,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.ByteArrayInputStream
+import java.io.FileOutputStream
+import java.net.URL
 import java.util.Locale
 
 class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
@@ -46,6 +49,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var isAdBlockEnabled = true
     private var defaultUserAgent: String? = null
     private var isPageLoading = false
+    private var isDesktopMode = false
     private var currentTabUrl: String? = null
     private val promptedHosts = mutableSetOf<String>()
 
@@ -59,6 +63,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         setContentView(R.layout.activity_browser_tab)
 
         prefs = getSharedPreferences(BrowserPreferences.PREFS_NAME, Context.MODE_PRIVATE)
+        isDesktopMode = intent.getBooleanExtra(EXTRA_DESKTOP_MODE, false)
 
         webView = findViewById(R.id.webView)
         searchInput = findViewById(R.id.searchInput)
@@ -74,6 +79,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         setupBottomBar()
         setupBackNavigation()
         setupSwipeRefresh()
+        setupLongPressActions()
 
         val initialQuery = intent.getStringExtra(EXTRA_QUERY)
         val initialUrl = intent.getStringExtra(EXTRA_URL)
@@ -97,12 +103,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        if (key in setOf(
-                BrowserPreferences.KEY_AD_BLOCKER,
-                BrowserPreferences.KEY_JAVASCRIPT,
-                BrowserPreferences.KEY_DESKTOP_MODE
-            )
-        ) {
+        if (key in setOf(BrowserPreferences.KEY_AD_BLOCKER, BrowserPreferences.KEY_JAVASCRIPT)) {
             applyBrowserSettings(reloadPage = true)
         }
     }
@@ -136,8 +137,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             domStorageEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = true
-            setSupportZoom(false)
-            builtInZoomControls = false
+            setSupportZoom(true)
+            builtInZoomControls = true
             displayZoomControls = false
         }
 
@@ -163,12 +164,20 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest): Boolean {
+                if (!request.isForMainFrame) return false
+
                 val target = request.url.toString()
-                if (request.isForMainFrame && isVideoUrl(target)) {
+                if (isVideoUrl(target)) {
                     startActivity(
                         Intent(this@BrowserTabActivity, VideoPlayerActivity::class.java)
                             .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, target)
                     )
+                    return true
+                }
+
+                val scheme = request.url.scheme.orEmpty().lowercase(Locale.US)
+                if (scheme in setOf("http", "https")) {
+                    loadWebPage(target)
                     return true
                 }
                 return false
@@ -228,9 +237,97 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun setupSwipeRefresh() {
         swipeRefresh.setColorSchemeColors(Color.parseColor("#B8C58A"))
-        swipeRefresh.setOnRefreshListener {
-            reloadCurrentPage()
+        swipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            webView.scrollY > 0 || webView.canScrollVertically(-1)
         }
+        swipeRefresh.setOnRefreshListener {
+            if (webView.scrollY == 0 && !webView.canScrollVertically(-1)) {
+                reloadCurrentPage()
+            } else {
+                swipeRefresh.isRefreshing = false
+            }
+        }
+    }
+
+    private fun setupLongPressActions() {
+        webView.setOnLongClickListener {
+            val hitResult = webView.hitTestResult ?: return@setOnLongClickListener false
+            val mediaUrl = when (hitResult.type) {
+                WebView.HitTestResult.IMAGE_TYPE,
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> hitResult.extra
+                else -> null
+            }
+
+            if (mediaUrl.isNullOrBlank() || !looksLikeImageAsset(mediaUrl)) {
+                return@setOnLongClickListener false
+            }
+
+            showMediaMenu(mediaUrl)
+            true
+        }
+    }
+
+    private fun showMediaMenu(url: String) {
+        val popup = PopupMenu(this, webView)
+        popup.menu.add(0, MENU_VIEW_IN_NEW_TAB, 0, getString(R.string.action_view_in_new_tab))
+        popup.menu.add(0, MENU_SHARE_MEDIA, 1, getString(R.string.action_share))
+        popup.menu.add(0, MENU_DOWNLOAD_MEDIA, 2, getString(R.string.action_download))
+        popup.menu.add(0, MENU_CLOSE_MEDIA_MENU, 3, getString(R.string.action_close))
+        popup.setOnMenuItemClickListener {
+            when (it.itemId) {
+                MENU_VIEW_IN_NEW_TAB -> {
+                    startActivity(Intent(this, BrowserTabActivity::class.java).putExtra(EXTRA_URL, url))
+                    true
+                }
+
+                MENU_SHARE_MEDIA -> {
+                    shareMedia(url)
+                    true
+                }
+
+                MENU_DOWNLOAD_MEDIA -> {
+                    downloadMedia(url)
+                    true
+                }
+
+                MENU_CLOSE_MEDIA_MENU -> true
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun shareMedia(url: String) {
+        startActivity(
+            Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, url)
+                },
+                getString(R.string.action_share)
+            )
+        )
+    }
+
+    private fun downloadMedia(url: String) {
+        Thread {
+            val result = runCatching {
+                val downloadsDir = FileUtils.ensureDownloadsDirectory(this)
+                val fileName = FileUtils.filenameFromUrl(url, "media")
+                val destination = FileUtils.createUniqueFile(downloadsDir, fileName)
+                URL(url).openStream().use { input ->
+                    FileOutputStream(destination).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                destination
+            }
+            runOnUiThread {
+                result
+                    .onSuccess { file -> toast(getString(R.string.msg_media_downloaded, file.name)) }
+                    .onFailure { toast(getString(R.string.msg_media_download_failed)) }
+            }
+        }.start()
     }
 
     private fun maybeHandleCredentialPrompt(url: String) {
@@ -305,6 +402,11 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun looksLikeAuthPage(url: String): Boolean {
         val lower = url.lowercase(Locale.US)
         return lower.contains("login") || lower.contains("signin") || lower.contains("signup") || lower.contains("register")
+    }
+
+    private fun looksLikeImageAsset(url: String): Boolean {
+        val lower = url.lowercase(Locale.US)
+        return listOf(".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp").any(lower::contains)
     }
 
     private fun updateReloadButton() {
@@ -382,9 +484,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
 
         val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
-        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
+        desktopSwitch.isChecked = isDesktopMode
         desktopSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
+            setDesktopModeEnabled(checked)
         }
 
         dialog.show()
@@ -423,11 +525,12 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun loadWebPage(url: String) {
+        val normalizedUrl = normalizeUrlForMode(url)
         val headers = buildRequestHeaders()
         if (headers.isEmpty()) {
-            webView.loadUrl(url)
+            webView.loadUrl(normalizedUrl)
         } else {
-            webView.loadUrl(url, headers)
+            webView.loadUrl(normalizedUrl, headers)
         }
     }
 
@@ -444,17 +547,35 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun buildRequestHeaders(): Map<String, String> {
         val userAgent = webView.settings.userAgentString ?: return emptyMap()
-        return mapOf("User-Agent" to userAgent)
+        return mapOf(
+            "User-Agent" to userAgent,
+            "X-Requested-With" to ""
+        )
+    }
+
+    private fun normalizeUrlForMode(url: String): String {
+        if (!isDesktopMode) return url
+        val uri = Uri.parse(url)
+        val host = uri.host.orEmpty().lowercase(Locale.US)
+        if (host == "m.youtube.com" || host == "youtube.com") {
+            return uri.buildUpon().authority("www.youtube.com").build().toString()
+        }
+        return url
     }
 
     private fun syncTabSession(url: String) {
-        val previousUrl = currentTabUrl
-        if (previousUrl == null) {
-            TabSessionStore.add(this, url)
-        } else if (previousUrl != url) {
-            TabSessionStore.replace(this, previousUrl, url)
-        }
+        TabSessionStore.upsert(this, currentTabUrl, url, isDesktopMode)
         currentTabUrl = url
+    }
+
+    private fun setDesktopModeEnabled(enabled: Boolean) {
+        if (isDesktopMode == enabled) return
+        isDesktopMode = enabled
+        applyBrowserSettings(reloadPage = true)
+        val currentUrl = webView.url ?: currentTabUrl
+        if (!currentUrl.isNullOrBlank()) {
+            syncTabSession(currentUrl)
+        }
     }
 
     private fun isVideoUrl(url: String): Boolean {
@@ -465,14 +586,13 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     @Suppress("SetJavaScriptEnabled")
     private fun applyBrowserSettings(reloadPage: Boolean) {
         val jsEnabled = prefs.getBoolean(BrowserPreferences.KEY_JAVASCRIPT, true)
-        val desktopMode = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
         isAdBlockEnabled = prefs.getBoolean(BrowserPreferences.KEY_AD_BLOCKER, true)
 
         webView.settings.javaScriptEnabled = jsEnabled
         webView.settings.domStorageEnabled = true
-        webView.settings.useWideViewPort = desktopMode
-        webView.settings.loadWithOverviewMode = desktopMode
-        webView.settings.userAgentString = if (desktopMode) {
+        webView.settings.useWideViewPort = isDesktopMode
+        webView.settings.loadWithOverviewMode = isDesktopMode
+        webView.settings.userAgentString = if (isDesktopMode) {
             DESKTOP_USER_AGENT
         } else {
             defaultUserAgent ?: webView.settings.userAgentString
@@ -490,8 +610,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     companion object {
         const val EXTRA_QUERY = "extra_query"
         const val EXTRA_URL = "extra_url"
+        const val EXTRA_DESKTOP_MODE = "extra_desktop_mode"
 
         private const val DESKTOP_USER_AGENT =
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+        private const val MENU_VIEW_IN_NEW_TAB = 1
+        private const val MENU_SHARE_MEDIA = 2
+        private const val MENU_DOWNLOAD_MEDIA = 3
+        private const val MENU_CLOSE_MEDIA_MENU = 4
     }
 }

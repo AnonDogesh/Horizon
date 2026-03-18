@@ -21,14 +21,15 @@ class TabManagerActivity : AppCompatActivity() {
         tabCountText = findViewById(R.id.textTabCount)
         tabsRecyclerView = findViewById(R.id.tabsRecyclerView)
         tabAdapter = TabManagerAdapter(
-            onTabClick = { url ->
+            onTabClick = { session ->
                 startActivity(
                     Intent(this, BrowserTabActivity::class.java)
-                        .putExtra(BrowserTabActivity.EXTRA_URL, url)
+                        .putExtra(BrowserTabActivity.EXTRA_URL, session.url)
+                        .putExtra(BrowserTabActivity.EXTRA_DESKTOP_MODE, session.desktopMode)
                 )
             },
-            onCloseTab = { url ->
-                removeTab(url)
+            onCloseTab = { session ->
+                removeTab(session.url)
                 loadTabs()
             },
             onNewTabClick = {
@@ -52,14 +53,12 @@ class TabManagerActivity : AppCompatActivity() {
     }
 
     private fun loadTabs() {
-        val urls = TabSessionStore.list(this)
-
-        tabAdapter.submitTabs(urls)
-        tabCountText.text = resources.getQuantityString(R.plurals.tab_manager_tabs_open, urls.size, urls.size)
+        val sessions = TabSessionStore.list(this)
+        tabAdapter.submitTabs(sessions)
+        tabCountText.text = resources.getQuantityString(R.plurals.tab_manager_tabs_open, sessions.size, sessions.size)
     }
 
     private fun removeTab(url: String) {
         TabSessionStore.remove(this, url)
     }
-
 }

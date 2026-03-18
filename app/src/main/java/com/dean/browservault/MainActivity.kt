@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import android.view.View
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import java.util.Locale
@@ -145,8 +146,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showBottomMenuSheet() {
-        val prefs = getSharedPreferences(BrowserPreferences.PREFS_NAME, MODE_PRIVATE)
-
         val dialog = BottomSheetDialog(this)
         val content = layoutInflater.inflate(R.layout.bottom_sheet_tab_menu, null)
         dialog.setContentView(content)
@@ -173,10 +172,9 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, DownloadsActivity::class.java))
         }
 
-        val desktopSwitch = content.findViewById<SwitchMaterial>(R.id.switchDesktopSite)
-        desktopSwitch.isChecked = prefs.getBoolean(BrowserPreferences.KEY_DESKTOP_MODE, false)
-        desktopSwitch.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(BrowserPreferences.KEY_DESKTOP_MODE, checked).apply()
+        content.findViewById<SwitchMaterial>(R.id.switchDesktopSite).apply {
+            isChecked = false
+            (parent as? View)?.visibility = View.GONE
         }
 
         dialog.show()
