@@ -100,18 +100,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupFeedActions() {
         feedCards.clear()
-        feedCards += findViewById(R.id.cardPrimary)
-        feedCards += findViewById(R.id.cardSecondary)
-        feedCards += findViewById(R.id.cardTertiary)
-        feedCards += findViewById(R.id.cardQuaternary)
-        feedCards += findViewById(R.id.cardQuinary)
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardPrimary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardSecondary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardTertiary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardQuaternary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardQuinary))
 
         feedTitles.clear()
-        feedTitles += findViewById(R.id.textCardPrimary)
-        feedTitles += findViewById(R.id.textCardSecondary)
-        feedTitles += findViewById(R.id.textCardTertiary)
-        feedTitles += findViewById(R.id.textCardQuaternary)
-        feedTitles += findViewById(R.id.textCardQuinary)
+        feedTitles.add(findViewById<TextView>(R.id.textCardPrimary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardSecondary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardTertiary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardQuaternary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardQuinary))
 
         feedCards.forEachIndexed { index, card ->
             card.setOnClickListener {
