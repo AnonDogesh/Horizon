@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <WebView
+        android:id="@+id/imageWebView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <ImageButton
+        android:id="@+id/buttonClose"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="16dp"
+        android:background="#66000000"
+        android:contentDescription="@string/action_close"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:tint="#FFFFFF" />
+
+</FrameLayout>

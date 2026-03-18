@@ -1,5 +1,6 @@
 package com.dean.browservault
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
@@ -8,6 +9,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
@@ -57,10 +59,7 @@ class DownloadsActivity : AppCompatActivity() {
     }
 
     private fun downloadsDirectory(): File {
-        val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
-            ?: File(filesDir, "downloads")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
+        return FileUtils.ensureDownloadsDirectory(this)
     }
 
     private fun loadFiles() {
@@ -77,11 +76,32 @@ class DownloadsActivity : AppCompatActivity() {
     }
 
     private fun handleFileClick(file: File) {
-        if (selectedPaths.isEmpty()) {
-            showRowMenu(recyclerView, file)
+        if (selectedPaths.isNotEmpty()) {
+            toggleSelection(file)
             return
         }
-        toggleSelection(file)
+        openDownloadedFile(file)
+    }
+
+    private fun openDownloadedFile(file: File) {
+        val uri = FileProvider.getUriForFile(this, FILE_PROVIDER_AUTHORITY, file)
+        when {
+            FileUtils.isVideoFile(file) -> {
+                startActivity(
+                    Intent(this, VideoPlayerActivity::class.java)
+                        .putExtra(VideoPlayerActivity.EXTRA_VIDEO_URL, uri.toString())
+                )
+            }
+
+            FileUtils.isImageFile(file) -> {
+                startActivity(
+                    Intent(this, ImageViewerActivity::class.java)
+                        .putExtra(ImageViewerActivity.EXTRA_IMAGE_URI, uri.toString())
+                )
+            }
+
+            else -> showRowMenu(recyclerView, file)
+        }
     }
 
     private fun toggleSelection(file: File) {
@@ -188,6 +208,7 @@ class DownloadsActivity : AppCompatActivity() {
     }
 
     companion object {
+        private const val FILE_PROVIDER_AUTHORITY = "com.dean.browservault.fileprovider"
         private const val MENU_MOVE = 1
         private const val MENU_DELETE = 2
     }
