@@ -407,7 +407,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun createFloatingMenuView(actions: List<MenuAction>): View {
-        val background = GradientDrawable().apply {
+        val menuBackground = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = dp(18).toFloat()
             setColor(Color.parseColor("#1B2218"))
@@ -416,7 +416,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = background
+            background = menuBackground
             elevation = dp(12).toFloat()
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
