@@ -4,6 +4,6 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSecondary">@color/horizon_accent_dark</item>
         <item name="colorSurface">@color/horizon_surface</item>
-        <item name="colorBackground">@color/horizon_bg</item>
+        <item name="android:colorBackground">@color/horizon_bg</item>
     </style>
 </resources>
