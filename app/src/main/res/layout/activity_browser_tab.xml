@@ -23,6 +23,16 @@
             android:paddingStart="6dp"
             android:paddingEnd="6dp">
 
+            <Spinner
+                android:id="@+id/spinnerSearchEngineBrowser"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:background="#171D15"
+                android:minWidth="72dp"
+                android:paddingStart="2dp"
+                android:paddingEnd="2dp" />
+
             <EditText
                 android:id="@+id/searchInput"
                 android:layout_width="0dp"
@@ -46,16 +56,6 @@
                 android:contentDescription="@string/action_clear"
                 android:src="@android:drawable/ic_menu_close_clear_cancel"
                 app:tint="#C7D0A5" />
-
-            <Spinner
-                android:id="@+id/spinnerSearchEngineBrowser"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="4dp"
-                android:background="#171D15"
-                android:minWidth="72dp"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp" />
 
             <ImageButton
                 android:id="@+id/buttonReload"

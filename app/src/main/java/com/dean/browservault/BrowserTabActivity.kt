@@ -64,6 +64,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private var isDesktopMode = false
     private var currentTabUrl: String? = null
     private var currentPlayingVideoUrl: String? = null
+    @Volatile
+    private var lastDetectedMediaUrl: String? = null
     private var lastTouchRawX = 0f
     private var lastTouchRawY = 0f
     private var currentFloatingMenu: PopupWindow? = null
@@ -184,6 +186,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 request: WebResourceRequest
             ): WebResourceResponse? {
                 val requestUrl = request.url.toString()
+                if (isLikelyMediaRequest(request)) {
+                    recordDetectedMediaUrl(requestUrl)
+                }
                 return if (isAdBlockEnabled && adBlocker.isAdUrl(requestUrl)) {
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
@@ -212,6 +217,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 super.onPageStarted(view, url, favicon)
                 isPageLoading = true
                 currentPlayingVideoUrl = null
+                lastDetectedMediaUrl = null
                 updateVideoActionButton()
                 loadingProgress.progress = 0
                 loadingProgress.visibility = View.VISIBLE
@@ -298,7 +304,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private fun setupVideoActionButton() {
         videoActionButton.setOnClickListener {
-            if (currentPlayingVideoUrl.isNullOrBlank()) {
+            if (resolveActionableVideoUrl().isNullOrBlank()) {
                 toast(getString(R.string.msg_no_active_video))
             } else {
                 showVideoMenu(videoActionButton)
@@ -307,7 +313,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun updateVideoActionButton() {
-        val hasVideo = !currentPlayingVideoUrl.isNullOrBlank()
+        val hasVideo = !resolveActionableVideoUrl().isNullOrBlank()
         videoActionButton.alpha = if (hasVideo) 1f else 0.45f
         videoActionButton.backgroundTintList = ColorStateList.valueOf(
             Color.parseColor(if (hasVideo) "#C7D0A5" else "#2A3126")
@@ -338,7 +344,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             actions = listOf(
                 MenuAction(R.string.action_watch) { watchCurrentVideo() },
                 MenuAction(R.string.action_download) {
-                    val url = currentPlayingVideoUrl
+                    val url = resolveActionableVideoUrl()
                     if (url.isNullOrBlank()) {
                         toast(getString(R.string.msg_no_active_video))
                     } else {
@@ -449,7 +455,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun watchCurrentVideo() {
-        val url = currentPlayingVideoUrl
+        val url = resolveActionableVideoUrl()
         if (url.isNullOrBlank() || !isDirectPlayableMediaUrl(url)) {
             toast(getString(R.string.msg_video_action_unavailable))
             return
@@ -577,8 +583,15 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             (function() {
               var bridge = window.$JS_BRIDGE_NAME;
               if (!bridge) return;
-              function notify(video, state) {
+              function resolveSrc(video) {
+                if (!video) return '';
                 var src = video.currentSrc || video.src || '';
+                if (src) return src;
+                var source = video.querySelector('source[src]');
+                return source ? (source.src || source.getAttribute('src') || '') : '';
+              }
+              function notify(video, state) {
+                var src = resolveSrc(video);
                 bridge.onVideoState(src, state);
               }
               function attach(video) {
@@ -612,7 +625,11 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
               var video = Array.from(document.querySelectorAll('video')).find(function(item) {
                 return !item.paused && !item.ended;
               });
-              return video ? (video.currentSrc || video.src || '') : '';
+              if (!video) return '';
+              var src = video.currentSrc || video.src || '';
+              if (src) return src;
+              var source = video.querySelector('source[src]');
+              return source ? (source.src || source.getAttribute('src') || '') : '';
             })();
             """.trimIndent()
         ) { rawValue ->
@@ -823,18 +840,51 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun isVideoUrl(url: String): Boolean {
-        val lower = url.lowercase(Locale.US)
-        return lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")
+        return looksLikeMediaAssetUrl(url)
     }
 
     private fun isDirectPlayableMediaUrl(url: String): Boolean {
         if (url.startsWith("blob:")) return false
-        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https", "content", "file")
+        val scheme = Uri.parse(url).scheme.orEmpty().lowercase(Locale.US)
+        if (scheme !in setOf("http", "https", "content", "file")) return false
+        return looksLikeMediaAssetUrl(url)
     }
 
     private fun isDownloadableMediaUrl(url: String): Boolean {
         if (url.startsWith("blob:")) return false
-        return Uri.parse(url).scheme.orEmpty().lowercase(Locale.US) in setOf("http", "https")
+        val scheme = Uri.parse(url).scheme.orEmpty().lowercase(Locale.US)
+        if (scheme !in setOf("http", "https")) return false
+        return looksLikeMediaAssetUrl(url)
+    }
+
+    private fun resolveActionableVideoUrl(): String? {
+        val primary = currentPlayingVideoUrl?.takeIf { isDirectPlayableMediaUrl(it) }
+        if (!primary.isNullOrBlank()) return primary
+        return lastDetectedMediaUrl?.takeIf { isDirectPlayableMediaUrl(it) }
+    }
+
+    private fun isLikelyMediaRequest(request: WebResourceRequest): Boolean {
+        val requestUrl = request.url.toString()
+        if (looksLikeMediaAssetUrl(requestUrl)) return true
+        val accept = request.requestHeaders["Accept"].orEmpty().lowercase(Locale.US)
+        return accept.contains("video/") || accept.contains("application/vnd.apple.mpegurl")
+    }
+
+    private fun recordDetectedMediaUrl(url: String) {
+        if (!isDirectPlayableMediaUrl(url)) return
+        if (url == lastDetectedMediaUrl) return
+        lastDetectedMediaUrl = url
+        runOnUiThread { updateVideoActionButton() }
+    }
+
+    private fun looksLikeMediaAssetUrl(url: String): Boolean {
+        val sanitized = url.substringBefore('#').substringBefore('?').lowercase(Locale.US)
+        return sanitized.endsWith(".mp4") ||
+            sanitized.endsWith(".m3u8") ||
+            sanitized.endsWith(".webm") ||
+            sanitized.endsWith(".mkv") ||
+            sanitized.endsWith(".m4v") ||
+            sanitized.endsWith(".mov")
     }
 
     @Suppress("SetJavaScriptEnabled")

@@ -2,6 +2,7 @@ package com.dean.browservault
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Xml
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
@@ -15,12 +16,18 @@ import com.google.android.material.button.MaterialButton
 import android.view.View
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+import org.xmlpull.v1.XmlPullParser
+import java.net.URL
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var inputSearch: EditText
     private lateinit var searchEngineSpinner: Spinner
+    private val feedCards = mutableListOf<MaterialCardView>()
+    private val feedTitles = mutableListOf<TextView>()
+    @Volatile
+    private var topNews: List<NewsItem> = emptyList()
 
     private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val url = result.data?.getStringExtra(SavedSitesActivity.EXTRA_SELECTED_URL) ?: return@registerForActivityResult
@@ -39,6 +46,7 @@ class MainActivity : AppCompatActivity() {
         setupShortcutActions()
         setupFeedActions()
         setupBottomActions()
+        loadRealNewsFeed()
     }
 
     private fun setupSearchEngineSpinner() {
@@ -91,14 +99,87 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupFeedActions() {
-        findViewById<MaterialCardView>(R.id.cardPrimary).setOnClickListener {
-            openUrl("https://en.wikipedia.org/wiki/Post-quantum_cryptography")
+        feedCards.clear()
+        feedCards += findViewById(R.id.cardPrimary)
+        feedCards += findViewById(R.id.cardSecondary)
+        feedCards += findViewById(R.id.cardTertiary)
+        feedCards += findViewById(R.id.cardQuaternary)
+        feedCards += findViewById(R.id.cardQuinary)
+
+        feedTitles.clear()
+        feedTitles += findViewById(R.id.textCardPrimary)
+        feedTitles += findViewById(R.id.textCardSecondary)
+        feedTitles += findViewById(R.id.textCardTertiary)
+        feedTitles += findViewById(R.id.textCardQuaternary)
+        feedTitles += findViewById(R.id.textCardQuinary)
+
+        feedCards.forEachIndexed { index, card ->
+            card.setOnClickListener {
+                topNews.getOrNull(index)?.let { item -> openUrl(item.link) }
+            }
         }
-        findViewById<MaterialCardView>(R.id.cardSecondary).setOnClickListener {
-            openUrl("https://www.bloomberg.com/markets")
+    }
+
+    private fun loadRealNewsFeed() {
+        Thread {
+            val fetchedNews = runCatching { fetchTopNews() }.getOrDefault(emptyList())
+            runOnUiThread {
+                if (fetchedNews.isNotEmpty()) {
+                    topNews = fetchedNews
+                    bindNewsToCards(fetchedNews)
+                } else {
+                    toast(getString(R.string.msg_news_load_failed))
+                }
+            }
+        }.start()
+    }
+
+    private fun bindNewsToCards(news: List<NewsItem>) {
+        feedTitles.forEachIndexed { index, titleView ->
+            val item = news.getOrNull(index)
+            titleView.text = item?.title ?: getString(R.string.news_not_available)
+            feedCards[index].isEnabled = item != null
+            feedCards[index].alpha = if (item != null) 1f else 0.55f
         }
-        findViewById<MaterialCardView>(R.id.cardTertiary).setOnClickListener {
-            openUrl("https://www.weforum.org/agenda/archive/geopolitics/")
+    }
+
+    private fun fetchTopNews(): List<NewsItem> {
+        val parser = Xml.newPullParser()
+        URL(NEWS_RSS_URL).openStream().use { input ->
+            parser.setInput(input, null)
+            var eventType = parser.eventType
+            val items = mutableListOf<NewsItem>()
+            var inItem = false
+            var title: String? = null
+            var link: String? = null
+
+            while (eventType != XmlPullParser.END_DOCUMENT && items.size < MAX_NEWS_ITEMS) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (parser.name) {
+                            "item" -> {
+                                inItem = true
+                                title = null
+                                link = null
+                            }
+                            "title" -> if (inItem) title = parser.nextText().orEmpty().trim()
+                            "link" -> if (inItem) link = parser.nextText().orEmpty().trim()
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        if (parser.name == "item" && inItem) {
+                            val articleTitle = title?.takeIf { it.isNotBlank() }
+                            val articleLink = link?.takeIf { it.startsWith("http") }
+                            if (articleTitle != null && articleLink != null) {
+                                items += NewsItem(articleTitle, articleLink)
+                            }
+                            inItem = false
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+            return items
         }
     }
 
@@ -191,5 +272,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private data class NewsItem(
+        val title: String,
+        val link: String
+    )
+
+    companion object {
+        private const val MAX_NEWS_ITEMS = 5
+        private const val NEWS_RSS_URL = "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en"
     }
 }

@@ -256,6 +256,7 @@
                     app:cardCornerRadius="16dp">
 
                     <TextView
+                        android:id="@+id/textCardPrimary"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:gravity="bottom|start"
@@ -275,6 +276,7 @@
                     app:cardCornerRadius="16dp">
 
                     <TextView
+                        android:id="@+id/textCardSecondary"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:gravity="bottom|start"
@@ -294,11 +296,52 @@
                     app:cardCornerRadius="16dp">
 
                     <TextView
+                        android:id="@+id/textCardTertiary"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:gravity="bottom|start"
                         android:padding="16dp"
                         android:text="@string/card_tertiary"
+                        android:textColor="#E6ECD7"
+                        android:textSize="23sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardQuaternary"
+                    android:layout_width="match_parent"
+                    android:layout_height="140dp"
+                    android:layout_marginBottom="12dp"
+                    app:cardBackgroundColor="#1A2435"
+                    app:cardCornerRadius="16dp">
+
+                    <TextView
+                        android:id="@+id/textCardQuaternary"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="bottom|start"
+                        android:padding="16dp"
+                        android:text="@string/card_quaternary"
+                        android:textColor="#E6ECD7"
+                        android:textSize="23sp"
+                        android:textStyle="bold" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/cardQuinary"
+                    android:layout_width="match_parent"
+                    android:layout_height="140dp"
+                    android:layout_marginBottom="12dp"
+                    app:cardBackgroundColor="#302614"
+                    app:cardCornerRadius="16dp">
+
+                    <TextView
+                        android:id="@+id/textCardQuinary"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:gravity="bottom|start"
+                        android:padding="16dp"
+                        android:text="@string/card_quinary"
                         android:textColor="#E6ECD7"
                         android:textSize="23sp"
                         android:textStyle="bold" />

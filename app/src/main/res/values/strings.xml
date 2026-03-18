@@ -126,9 +126,13 @@
     <string name="nav_menu">MENU</string>
 
     <string name="home_for_you">For You</string>
-    <string name="card_primary">The Future of Post-Quantum Encryption is Here</string>
-    <string name="card_secondary">Market trends for high-net-worth investors in 2024</string>
-    <string name="card_tertiary">The shift towards regional digital sovereignty</string>
+    <string name="card_primary">Loading latest news…</string>
+    <string name="card_secondary">Loading latest news…</string>
+    <string name="card_tertiary">Loading latest news…</string>
+    <string name="card_quaternary">Loading latest news…</string>
+    <string name="card_quinary">Loading latest news…</string>
+    <string name="msg_news_load_failed">Could not load latest news</string>
+    <string name="news_not_available">News unavailable</string>
 
     <string name="title_delete_file">Delete file?</string>
     <string name="msg_no_back_history">No previous page</string>
