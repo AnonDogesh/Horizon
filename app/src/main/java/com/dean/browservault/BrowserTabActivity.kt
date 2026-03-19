@@ -10,6 +10,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -42,11 +43,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONArray
 import java.io.ByteArrayInputStream
-import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -190,12 +188,15 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 request: WebResourceRequest
             ): WebResourceResponse? {
                 val requestUrl = request.url.toString()
+                Log.d("WEB_REQ", requestUrl)
                 if (requestUrl.contains(".mp4", ignoreCase = true) || requestUrl.contains(".m3u8", ignoreCase = true)) {
                     currentPlayingVideoUrl = requestUrl
                     recordDetectedMediaUrl(requestUrl)
                 }
-                val isAdRequest = isAdBlockEnabled && adBlocker.isAdUrl(requestUrl)
+                val pageUrl = webView.url ?: currentTabUrl.orEmpty()
+                val isAdRequest = isAdBlockEnabled && isThirdParty(requestUrl, pageUrl) && adBlocker.isAdUrl(requestUrl)
                 return if (isAdRequest) {
+                    Log.d("BLOCKED", requestUrl)
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
                     super.shouldInterceptRequest(view, request)
@@ -501,6 +502,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             Thread {
                 val urls = synchronized(detectedVideoUrls) { detectedVideoUrls.toList() }
                 val candidates = urls.mapNotNull { url -> buildVideoCandidate(url) }
+                    .sortedByDescending { it.score }
                 runOnUiThread { onReady(candidates) }
             }.start()
         }
@@ -511,7 +513,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         val size = probeContentLength(url)
         val contentType = probeContentType(url)
         if (!isLikelyPlayableVideo(url, contentType)) return null
-        return VideoCandidate(url = url, sizeBytes = size)
+        return VideoCandidate(url = url, sizeBytes = size, score = scoreVideoCandidate(url))
     }
 
     private fun showVideoCandidatePopup(anchor: View, candidates: List<VideoCandidate>) {
@@ -660,57 +662,22 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             toast(getString(R.string.msg_media_download_failed))
             return
         }
-        if (url.contains(".m3u8", ignoreCase = true)) {
-            downloadHls(url)
-        } else {
-            downloadMp4(url)
-        }
-    }
-
-    private fun downloadMp4(url: String) {
-        Thread {
-            val result = runCatching {
-                val downloadsDir = FileUtils.ensureDownloadsDirectory(this)
-                val fileName = FileUtils.filenameFromUrl(url, "media")
-                val destination = FileUtils.createUniqueFile(downloadsDir, fileName)
-
-                val client = OkHttpClient()
-                val request = Request.Builder()
-                    .url(url)
-                    .addHeader("User-Agent", webView.settings.userAgentString.orEmpty())
-                    .addHeader("Cookie", getCookies(url))
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
-                    val input = response.body?.byteStream() ?: throw IllegalStateException("Empty response body")
-                    FileOutputStream(destination).use { output ->
-                        input.copyTo(output)
+        DownloadManager.enqueue(
+            DownloadTask(
+                context = this,
+                url = url,
+                userAgent = webView.settings.userAgentString.orEmpty(),
+                cookies = getCookies(url)
+            ) { task ->
+                runOnUiThread {
+                    if (task.status == "COMPLETED" && task.outputPath != null) {
+                        toast("Downloaded: ${FileUtils.filenameFromUrl(task.outputPath!!, "media")}")
+                    } else {
+                        toast("Download failed: ${task.error ?: "Unknown error"}")
                     }
                 }
-                destination
             }
-
-            runOnUiThread {
-                result.onSuccess {
-                    toast("Downloaded: ${it.name}")
-                }.onFailure {
-                    toast("Download failed: ${it.message}")
-                }
-            }
-        }.start()
-    }
-
-    private fun downloadHls(url: String) {
-        val output = FileUtils.ensureDownloadsDirectory(this)
-            .absolutePath + "/video_${System.currentTimeMillis()}.mp4"
-        val command = "-y -i \"$url\" -c copy -bsf:a aac_adtstoasc \"$output\""
-        FFmpegEngine.run(command) { success ->
-            runOnUiThread {
-                if (success) toast("HLS Downloaded")
-                else toast("HLS Failed")
-            }
-        }
+        )
     }
 
     private fun getCookies(url: String): String {
@@ -1088,20 +1055,45 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun resolveActionableVideoUrl(): String? {
-        val primary = currentPlayingVideoUrl?.takeIf { isDirectPlayableMediaUrl(it) }
-        if (!primary.isNullOrBlank()) return primary
-        return synchronized(detectedVideoUrls) {
-            detectedVideoUrls.firstOrNull { isDirectPlayableMediaUrl(it) }
+        val candidates = mutableListOf<String>()
+        currentPlayingVideoUrl?.let { candidates.add(it) }
+        synchronized(detectedVideoUrls) {
+            candidates.addAll(detectedVideoUrls)
         }
+        return candidates
+            .distinct()
+            .map { candidate -> VideoCandidate(candidate, null, scoreVideoCandidate(candidate)) }
+            .filter { isDirectPlayableMediaUrl(it.url) }
+            .maxByOrNull { it.score }
+            ?.url
     }
 
     private fun recordDetectedMediaUrl(url: String) {
         if (adBlocker.isAdUrl(url)) return
         if (!isDirectPlayableMediaUrl(url)) return
+        Log.d("VIDEO_CANDIDATE", url)
         synchronized(detectedVideoUrls) {
             detectedVideoUrls.add(url)
         }
         runOnUiThread { updateVideoActionButton() }
+    }
+
+    private fun scoreVideoCandidate(url: String): Int {
+        val lower = url.lowercase(Locale.US)
+        var score = 0
+        if (lower.contains(".m3u8")) score += 50
+        if (lower.contains("1080")) score += 40
+        if (lower.contains("720")) score += 30
+        if (lower.contains("ads") || lower.contains("doubleclick")) score -= 100
+        if (lower.contains("preview")) score -= 50
+        return score
+    }
+
+    private fun isThirdParty(requestUrl: String, mainUrl: String): Boolean {
+        val requestHost = runCatching { Uri.parse(requestUrl).host }.getOrNull()
+        val mainHost = runCatching { Uri.parse(mainUrl).host }.getOrNull()
+        if (requestHost.isNullOrBlank() || mainHost.isNullOrBlank()) return false
+        return requestHost != mainHost
     }
 
     private fun looksLikeMediaAssetUrl(url: String): Boolean {
@@ -1169,7 +1161,8 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
 
     private data class VideoCandidate(
         val url: String,
-        val sizeBytes: Long?
+        val sizeBytes: Long?,
+        val score: Int
     )
 
     private inner class BrowserJsBridge {
