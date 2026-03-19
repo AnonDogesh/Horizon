@@ -3,6 +3,7 @@ package com.dean.browservault
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.util.Xml
 import android.widget.ArrayAdapter
@@ -80,7 +81,16 @@ class MainActivity : AppCompatActivity() {
             searchFromInput()
         }
         inputSearch.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+            val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE
+            if (isSearchAction) {
+                searchFromInput()
+                true
+            } else {
+                false
+            }
+        }
+        inputSearch.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
                 searchFromInput()
                 true
             } else {
@@ -281,7 +291,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openUrl(url: String) {
-        SavedSiteStore.add(this, SavedSiteStore.TYPE_HISTORY, url)
+        runCatching {
+            SavedSiteStore.add(this, SavedSiteStore.TYPE_HISTORY, url)
+        }
 
         val lower = url.lowercase(Locale.US)
         if (lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")) {
@@ -292,10 +304,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        startActivity(
-            Intent(this, BrowserTabActivity::class.java)
-                .putExtra(BrowserTabActivity.EXTRA_URL, url)
-        )
+        runCatching {
+            startActivity(
+                Intent(this, BrowserTabActivity::class.java)
+                    .putExtra(BrowserTabActivity.EXTRA_URL, url)
+            )
+        }.onFailure {
+            toast(getString(R.string.msg_failed_to_open_page))
+        }
     }
 
     private fun showBottomMenuSheet() {

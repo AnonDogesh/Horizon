@@ -21,12 +21,17 @@ object SavedSiteStore {
             return migrated
         }
 
-        val array = JSONArray(raw)
-        return buildList {
-            for (index in 0 until array.length()) {
-                add(array.optString(index))
-            }
-        }.filter { it.isNotBlank() }
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    add(array.optString(index))
+                }
+            }.filter { it.isNotBlank() }
+        }.getOrElse {
+            prefs.edit().remove(key(type)).apply()
+            emptyList()
+        }
     }
 
     fun add(context: Context, type: String, url: String) {
