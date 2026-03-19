@@ -1,0 +1,9 @@
+<resources>
+    <color name="horizon_bg">#F7F7F2</color>
+    <color name="horizon_surface">#FFFFFF</color>
+    <color name="horizon_surface_alt">#EEF4FF</color>
+    <color name="horizon_text_primary">#1D2A3A</color>
+    <color name="horizon_text_secondary">#4B647D</color>
+    <color name="horizon_accent">#4FA8FF</color>
+    <color name="horizon_accent_dark">#227EDB</color>
+</resources>
