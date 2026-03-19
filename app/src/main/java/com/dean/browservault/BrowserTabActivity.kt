@@ -196,9 +196,11 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 val pageUrl = webView.url ?: currentTabUrl.orEmpty()
                 val isAdRequest = isAdBlockEnabled && isThirdParty(requestUrl, pageUrl) && adBlocker.isAdUrl(requestUrl)
                 return if (isAdRequest) {
+                    DebugStats.blocked += 1
                     Log.d("BLOCKED", requestUrl)
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
+                    DebugStats.allowed += 1
                     super.shouldInterceptRequest(view, request)
                 }
             }
@@ -246,6 +248,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                     injectVideoObserver()
                     refreshPlayingVideoStateFromPage()
                     collectVideoCandidatesFromPage()
+                    extractVideoSourcesViaJs()
                 }
             }
         }
@@ -840,6 +843,18 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         }
     }
 
+    private fun extractVideoSourcesViaJs() {
+        webView.evaluateJavascript(
+            """
+            [...document.querySelectorAll('video')].map(v => v.src || '');
+            """.trimIndent()
+        ) { rawValue ->
+            parseJavascriptArray(rawValue)
+                .filter { it.isNotBlank() }
+                .forEach { recordDetectedMediaUrl(it) }
+        }
+    }
+
     private fun parseJavascriptString(rawValue: String?): String? {
         val value = rawValue.orEmpty().trim()
         if (value.isBlank() || value == "null" || value == "\"\"") return null
@@ -1071,6 +1086,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun recordDetectedMediaUrl(url: String) {
         if (adBlocker.isAdUrl(url)) return
         if (!isDirectPlayableMediaUrl(url)) return
+        DebugStats.videoDetected += 1
         Log.d("VIDEO_CANDIDATE", url)
         synchronized(detectedVideoUrls) {
             detectedVideoUrls.add(url)
