@@ -42,8 +42,11 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.switchmaterial.SwitchMaterial
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 import java.io.ByteArrayInputStream
+import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
@@ -653,13 +656,64 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             toast(getString(R.string.msg_media_download_failed))
             return
         }
-        val task = DownloadQueue.enqueue(url)
-        startService(
-            Intent(this, DownloadService::class.java)
-                .putExtra(DownloadService.EXTRA_URL, url)
-                .putExtra(DownloadService.EXTRA_TASK_ID, task.id)
-        )
-        toast(getString(R.string.msg_download_started))
+        if (url.contains(".m3u8", ignoreCase = true)) {
+            downloadHls(url)
+        } else {
+            downloadMp4(url)
+        }
+    }
+
+    private fun downloadMp4(url: String) {
+        Thread {
+            val result = runCatching {
+                val downloadsDir = FileUtils.ensureDownloadsDirectory(this)
+                val fileName = FileUtils.filenameFromUrl(url, "media")
+                val destination = FileUtils.createUniqueFile(downloadsDir, fileName)
+
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url(url)
+                    .addHeader("User-Agent", webView.settings.userAgentString.orEmpty())
+                    .addHeader("Cookie", getCookies(url))
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw IllegalStateException("HTTP ${response.code}")
+                    val input = response.body?.byteStream() ?: throw IllegalStateException("Empty response body")
+                    FileOutputStream(destination).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                destination
+            }
+
+            runOnUiThread {
+                result.onSuccess {
+                    toast("Downloaded: ${it.name}")
+                }.onFailure {
+                    toast("Download failed: ${it.message}")
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadHls(url: String) {
+        Thread {
+            val downloadsDir = FileUtils.ensureDownloadsDirectory(this)
+            val resultPath = HlsDownloader.download(url, downloadsDir.absolutePath)
+            runOnUiThread {
+                if (resultPath != null) {
+                    toast("Downloaded: ${FileUtils.filenameFromUrl(resultPath, "video")}")
+                } else {
+                    toast(getString(R.string.msg_media_download_failed))
+                }
+            }
+        }.start()
+    }
+
+    private fun getCookies(url: String): String {
+        val cookieManager = android.webkit.CookieManager.getInstance()
+        return cookieManager.getCookie(url) ?: ""
     }
 
     private fun maybeHandleCredentialPrompt(url: String) {

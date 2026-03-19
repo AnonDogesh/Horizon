@@ -96,7 +96,6 @@
     <string name="label_size_unknown">Size unknown</string>
     <string name="msg_media_downloaded">Saved %1$s to downloads</string>
     <string name="msg_media_download_failed">Could not download media</string>
-    <string name="msg_download_started">Download started in background</string>
     <string name="msg_bookmark_saved">Saved to bookmarks</string>
     <string name="msg_no_bookmarks">No bookmarks yet</string>
     <string name="msg_downloads_not_available">Downloads page is not available on this device</string>
