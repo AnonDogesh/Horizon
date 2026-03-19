@@ -187,18 +187,18 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 view: WebView?,
                 request: WebResourceRequest
             ): WebResourceResponse? {
-                val requestUrl = request.url.toString()
-                Log.d("WEB_REQ", requestUrl)
-                val pageUrl = webView.url ?: currentTabUrl.orEmpty()
-                if (requestUrl.contains(".mp4", ignoreCase = true) || requestUrl.contains(".m3u8", ignoreCase = true)) {
-                    VideoSniffer.add(requestUrl, pageUrl)
-                    currentPlayingVideoUrl = VideoSniffer.getBest()?.url ?: requestUrl
-                    recordDetectedMediaUrl(requestUrl)
+                val url = request.url.toString()
+                Log.d("WEB_REQ", url)
+                val pageUrl = view?.url ?: currentTabUrl.orEmpty()
+                if (isMedia(url)) {
+                    VideoSniffer.add(url, pageUrl)
+                    currentPlayingVideoUrl = VideoSniffer.getBest()?.url ?: url
+                    recordDetectedMediaUrl(url)
                 }
-                val isAdRequest = isAdBlockEnabled && isThirdParty(requestUrl, pageUrl) && adBlocker.isAdUrl(requestUrl)
+                val isAdRequest = isAdBlockEnabled && isThirdParty(url, pageUrl) && adBlocker.isAdUrl(url)
                 return if (isAdRequest) {
                     DebugStats.blocked += 1
-                    Log.d("BLOCKED", requestUrl)
+                    Log.d("BLOCKED", url)
                     WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                 } else {
                     DebugStats.allowed += 1
@@ -500,6 +500,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun buildVideoCandidates(onReady: (List<VideoCandidateUi>) -> Unit) {
         collectVideoCandidatesFromPage {
             Thread {
+                expandHlsVariantCandidates(VideoSniffer.all())
                 val candidates = VideoSniffer.all()
                     .mapNotNull { candidate -> buildVideoCandidate(candidate) }
                     .sortedByDescending { it.candidate.score }
@@ -534,8 +535,13 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             addView(content)
         }
 
-        candidates.forEach { candidate ->
-            content.addView(createVideoCandidateRow(candidate))
+        val grouped = candidates.groupBy { it.candidate.quality ?: 0 }
+            .toSortedMap(compareByDescending { it })
+        grouped.forEach { (quality, items) ->
+            content.addView(createQualityHeader(quality))
+            items.forEach { candidate ->
+                content.addView(createVideoCandidateRow(candidate))
+            }
         }
 
         val popup = PopupWindow(
@@ -592,7 +598,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             text = getString(R.string.action_download)
             setOnClickListener {
                 currentFloatingMenu?.dismiss()
-                downloadMedia(candidate.candidate.url)
+                downloadSelected(candidate.candidate)
             }
         }
 
@@ -606,6 +612,15 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             setBackgroundColor(Color.parseColor("#2F3A2A"))
         })
         return container
+    }
+
+    private fun createQualityHeader(quality: Int): View {
+        return TextView(this).apply {
+            text = if (quality > 0) "${quality}p" else getString(R.string.label_quality_unknown)
+            setTextColor(Color.parseColor("#9FAF89"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(dp(6), dp(8), dp(6), dp(4))
+        }
     }
 
     private fun probeContentLength(url: String): Long? {
@@ -678,6 +693,13 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 }
             }
         )
+    }
+
+    private fun downloadSelected(candidate: VideoCandidate) {
+        when (candidate.type) {
+            "hls", "mp4", "mpd" -> downloadMedia(candidate.url)
+            else -> downloadMedia(candidate.url)
+        }
     }
 
     private fun getCookies(url: String): String {
@@ -843,13 +865,34 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     private fun extractVideoSourcesViaJs() {
         webView.evaluateJavascript(
             """
-            [...document.querySelectorAll('video')].map(v => v.src || '');
+            JSON.stringify(
+                Array.from(document.querySelectorAll('video')).map(v => v.src || '')
+            );
             """.trimIndent()
         ) { rawValue ->
             parseJavascriptArray(rawValue)
                 .filter { it.isNotBlank() }
                 .forEach { recordDetectedMediaUrl(it) }
         }
+    }
+
+    private fun expandHlsVariantCandidates(existing: List<VideoCandidate>) {
+        existing.filter { it.type == "hls" }.forEach { candidate ->
+            val playlistContent = fetchUrlText(candidate.url) ?: return@forEach
+            val variants = VideoSniffer.parseM3u8Variants(playlistContent, candidate.url, candidate.sourcePage)
+            variants.forEach { VideoSniffer.add(it.url, it.sourcePage) }
+        }
+    }
+
+    private fun fetchUrlText(url: String): String? {
+        return runCatching {
+            (URL(url).openConnection() as? HttpURLConnection)?.run {
+                connectTimeout = 5000
+                readTimeout = 5000
+                requestMethod = "GET"
+                inputStream.bufferedReader().use { it.readText() }.also { disconnect() }
+            }
+        }.getOrNull()
     }
 
     private fun parseJavascriptString(rawValue: String?): String? {
@@ -1051,6 +1094,10 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun isVideoUrl(url: String): Boolean {
+        return looksLikeMediaAssetUrl(url)
+    }
+
+    private fun isMedia(url: String): Boolean {
         return looksLikeMediaAssetUrl(url)
     }
 

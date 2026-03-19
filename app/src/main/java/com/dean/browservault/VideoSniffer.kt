@@ -39,6 +39,37 @@ object VideoSniffer {
     @Synchronized
     fun all(): List<VideoCandidate> = candidates.toList()
 
+    fun parseM3u8Variants(content: String, baseUrl: String, sourcePage: String): List<VideoCandidate> {
+        val lines = content.lines().map { it.trim() }
+        val parsed = mutableListOf<VideoCandidate>()
+        var pendingResolution: Int? = null
+
+        lines.forEach { line ->
+            when {
+                line.startsWith("#EXT-X-STREAM-INF", ignoreCase = true) -> {
+                    pendingResolution = extractResolution(line)
+                }
+                line.isBlank() || line.startsWith("#") -> Unit
+                else -> {
+                    val resolvedUrl = resolveRelativeUrl(baseUrl, line)
+                    val quality = pendingResolution ?: extractQuality(resolvedUrl.lowercase(Locale.US))
+                    parsed.add(
+                        VideoCandidate(
+                            url = resolvedUrl,
+                            type = "hls",
+                            quality = quality,
+                            bitrate = null,
+                            sourcePage = sourcePage,
+                            score = computeScore(resolvedUrl.lowercase(Locale.US), "hls", quality)
+                        )
+                    )
+                    pendingResolution = null
+                }
+            }
+        }
+        return parsed
+    }
+
     private fun analyze(url: String, page: String): VideoCandidate {
         val lower = url.lowercase(Locale.US)
         val type = when {
@@ -56,6 +87,17 @@ object VideoSniffer {
     private fun extractQuality(url: String): Int? {
         return listOf(2160, 1440, 1080, 720, 480, 360, 240)
             .firstOrNull { q -> url.contains(q.toString()) }
+    }
+
+    private fun extractResolution(extLine: String): Int? {
+        val match = Regex("""RESOLUTION=\d+x(\d+)""", RegexOption.IGNORE_CASE).find(extLine)
+        return match?.groupValues?.getOrNull(1)?.toIntOrNull()
+    }
+
+    private fun resolveRelativeUrl(baseUrl: String, candidatePath: String): String {
+        return runCatching {
+            java.net.URL(java.net.URL(baseUrl), candidatePath).toString()
+        }.getOrElse { candidatePath }
     }
 
     private fun computeScore(url: String, type: String, quality: Int?): Int {

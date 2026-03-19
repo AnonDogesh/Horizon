@@ -94,6 +94,7 @@
     <string name="msg_video_action_unavailable">This video cannot be opened in the native player</string>
     <string name="action_close">Close</string>
     <string name="label_size_unknown">Size unknown</string>
+    <string name="label_quality_unknown">Unknown quality</string>
     <string name="msg_media_downloaded">Saved %1$s to downloads</string>
     <string name="msg_media_download_failed">Could not download media</string>
     <string name="msg_bookmark_saved">Saved to bookmarks</string>
