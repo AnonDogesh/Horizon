@@ -1,26 +1,39 @@
 package com.dean.browservault
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.util.Xml
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import android.view.View
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
+import org.xmlpull.v1.XmlPullParser
+import java.net.URL
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var inputSearch: EditText
     private lateinit var searchEngineSpinner: Spinner
+    private lateinit var feedPrefs: SharedPreferences
+    private val feedCards = mutableListOf<MaterialCardView>()
+    private val feedTitles = mutableListOf<TextView>()
+    @Volatile
+    private var topNews: List<NewsItem> = emptyList()
 
     private val savedSitesLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val url = result.data?.getStringExtra(SavedSitesActivity.EXTRA_SELECTED_URL) ?: return@registerForActivityResult
@@ -33,12 +46,14 @@ class MainActivity : AppCompatActivity() {
 
         inputSearch = findViewById(R.id.inputSearch)
         searchEngineSpinner = findViewById(R.id.spinnerSearchEngineHome)
+        feedPrefs = getSharedPreferences(FEED_PREFS, MODE_PRIVATE)
 
         setupSearchEngineSpinner()
         setupTopActions()
         setupShortcutActions()
         setupFeedActions()
         setupBottomActions()
+        loadRealNewsFeed()
     }
 
     private fun setupSearchEngineSpinner() {
@@ -65,13 +80,30 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialButton>(R.id.buttonSearch).setOnClickListener {
             searchFromInput()
         }
+        inputSearch.setOnEditorActionListener { _, actionId, _ ->
+            val isSearchAction = actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE
+            if (isSearchAction) {
+                searchFromInput()
+                true
+            } else {
+                false
+            }
+        }
+        inputSearch.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
+                searchFromInput()
+                true
+            } else {
+                false
+            }
+        }
 
         findViewById<ImageButton>(R.id.buttonSettings).setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         findViewById<TextView>(R.id.textCustomize).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+            showCustomizeFeedDialog()
         }
     }
 
@@ -91,14 +123,145 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupFeedActions() {
-        findViewById<MaterialCardView>(R.id.cardPrimary).setOnClickListener {
-            openUrl("https://en.wikipedia.org/wiki/Post-quantum_cryptography")
+        feedCards.clear()
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardPrimary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardSecondary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardTertiary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardQuaternary))
+        feedCards.add(findViewById<MaterialCardView>(R.id.cardQuinary))
+
+        feedTitles.clear()
+        feedTitles.add(findViewById<TextView>(R.id.textCardPrimary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardSecondary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardTertiary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardQuaternary))
+        feedTitles.add(findViewById<TextView>(R.id.textCardQuinary))
+
+        feedCards.forEachIndexed { index, card ->
+            card.setOnClickListener {
+                topNews.getOrNull(index)?.let { item -> openUrl(item.link) }
+            }
         }
-        findViewById<MaterialCardView>(R.id.cardSecondary).setOnClickListener {
-            openUrl("https://www.bloomberg.com/markets")
+    }
+
+    private fun loadRealNewsFeed() {
+        Thread {
+            val fetchedNews = runCatching { fetchTopNews(buildNewsFeedUrl()) }.getOrDefault(emptyList())
+            runOnUiThread {
+                if (fetchedNews.isNotEmpty()) {
+                    topNews = fetchedNews
+                    bindNewsToCards(fetchedNews)
+                } else {
+                    toast(getString(R.string.msg_news_load_failed))
+                }
+            }
+        }.start()
+    }
+
+    private fun bindNewsToCards(news: List<NewsItem>) {
+        feedTitles.forEachIndexed { index, titleView ->
+            val item = news.getOrNull(index)
+            titleView.text = item?.title ?: getString(R.string.news_not_available)
+            feedCards[index].isEnabled = item != null
+            feedCards[index].alpha = if (item != null) 1f else 0.55f
         }
-        findViewById<MaterialCardView>(R.id.cardTertiary).setOnClickListener {
-            openUrl("https://www.weforum.org/agenda/archive/geopolitics/")
+    }
+
+    private fun fetchTopNews(url: String): List<NewsItem> {
+        val parser = Xml.newPullParser()
+        URL(url).openStream().use { input ->
+            parser.setInput(input, null)
+            var eventType = parser.eventType
+            val items = mutableListOf<NewsItem>()
+            var inItem = false
+            var title: String? = null
+            var link: String? = null
+
+            while (eventType != XmlPullParser.END_DOCUMENT && items.size < MAX_NEWS_ITEMS) {
+                when (eventType) {
+                    XmlPullParser.START_TAG -> {
+                        when (parser.name) {
+                            "item" -> {
+                                inItem = true
+                                title = null
+                                link = null
+                            }
+                            "title" -> if (inItem) title = parser.nextText().orEmpty().trim()
+                            "link" -> if (inItem) link = parser.nextText().orEmpty().trim()
+                        }
+                    }
+                    XmlPullParser.END_TAG -> {
+                        if (parser.name == "item" && inItem) {
+                            val articleTitle = title?.takeIf { it.isNotBlank() }
+                            val articleLink = link?.takeIf { it.startsWith("http") }
+                            if (articleTitle != null && articleLink != null) {
+                                items += NewsItem(articleTitle, articleLink)
+                            }
+                            inItem = false
+                        }
+                    }
+                }
+                eventType = parser.next()
+            }
+            return items
+        }
+    }
+
+    private fun showCustomizeFeedDialog() {
+        val countries = listOf("US", "GB", "IN", "CA", "AU")
+        val categories = listOf("Top", "World", "Business", "Technology", "Sports", "Health")
+
+        val countrySpinner = Spinner(this)
+        countrySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, countries).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        countrySpinner.setSelection(countries.indexOf(selectedCountry()).coerceAtLeast(0))
+
+        val categorySpinner = Spinner(this)
+        categorySpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+        categorySpinner.setSelection(categories.indexOf(selectedCategory()).coerceAtLeast(0))
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 8)
+            addView(TextView(this@MainActivity).apply { text = getString(R.string.feed_country_label) })
+            addView(countrySpinner)
+            addView(TextView(this@MainActivity).apply {
+                text = getString(R.string.feed_category_label)
+                setPadding(0, 20, 0, 0)
+            })
+            addView(categorySpinner)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.title_customize_feed)
+            .setView(content)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                feedPrefs.edit()
+                    .putString(KEY_FEED_COUNTRY, countries[countrySpinner.selectedItemPosition])
+                    .putString(KEY_FEED_CATEGORY, categories[categorySpinner.selectedItemPosition])
+                    .apply()
+                loadRealNewsFeed()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun selectedCountry(): String = feedPrefs.getString(KEY_FEED_COUNTRY, "US").orEmpty()
+
+    private fun selectedCategory(): String = feedPrefs.getString(KEY_FEED_CATEGORY, "Top").orEmpty()
+
+    private fun buildNewsFeedUrl(): String {
+        val country = selectedCountry()
+        val category = selectedCategory()
+        val topic = CATEGORY_TO_TOPIC[category]
+        val language = "en-$country"
+        return if (topic == null) {
+            "https://news.google.com/rss?hl=$language&gl=$country&ceid=$country:en"
+        } else {
+            "https://news.google.com/rss/headlines/section/topic/$topic?hl=$language&gl=$country&ceid=$country:en"
         }
     }
 
@@ -128,7 +291,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openUrl(url: String) {
-        SavedSiteStore.add(this, SavedSiteStore.TYPE_HISTORY, url)
+        runCatching {
+            SavedSiteStore.add(this, SavedSiteStore.TYPE_HISTORY, url)
+        }
 
         val lower = url.lowercase(Locale.US)
         if (lower.endsWith(".mp4") || lower.endsWith(".m3u8") || lower.endsWith(".webm")) {
@@ -139,10 +304,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        startActivity(
-            Intent(this, BrowserTabActivity::class.java)
-                .putExtra(BrowserTabActivity.EXTRA_URL, url)
-        )
+        runCatching {
+            startActivity(
+                Intent(this, BrowserTabActivity::class.java)
+                    .putExtra(BrowserTabActivity.EXTRA_URL, url)
+            )
+        }.onFailure {
+            toast(getString(R.string.msg_failed_to_open_page))
+        }
     }
 
     private fun showBottomMenuSheet() {
@@ -191,5 +360,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun toast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private data class NewsItem(
+        val title: String,
+        val link: String
+    )
+
+    companion object {
+        private const val MAX_NEWS_ITEMS = 5
+        private const val FEED_PREFS = "feed_preferences"
+        private const val KEY_FEED_COUNTRY = "feed_country"
+        private const val KEY_FEED_CATEGORY = "feed_category"
+        private val CATEGORY_TO_TOPIC = mapOf(
+            "Top" to null,
+            "World" to "WORLD",
+            "Business" to "BUSINESS",
+            "Technology" to "TECHNOLOGY",
+            "Sports" to "SPORTS",
+            "Health" to "HEALTH"
+        )
     }
 }
