@@ -1,3 +1,9 @@
 <resources>
-    <style name="Theme.Horizon" parent="Theme.Material3.DayNight.NoActionBar" />
+    <style name="Theme.Horizon" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/horizon_accent</item>
+        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorSecondary">@color/horizon_accent_dark</item>
+        <item name="colorSurface">@color/horizon_surface</item>
+        <item name="android:colorBackground">@color/horizon_bg</item>
+    </style>
 </resources>
