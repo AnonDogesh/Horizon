@@ -3,6 +3,7 @@ package com.dean.browservault
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.inputmethod.EditorInfo
 import android.util.Xml
 import android.widget.ArrayAdapter
 import android.widget.EditText
@@ -77,6 +78,14 @@ class MainActivity : AppCompatActivity() {
     private fun setupTopActions() {
         findViewById<MaterialButton>(R.id.buttonSearch).setOnClickListener {
             searchFromInput()
+        }
+        inputSearch.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                searchFromInput()
+                true
+            } else {
+                false
+            }
         }
 
         findViewById<ImageButton>(R.id.buttonSettings).setOnClickListener {

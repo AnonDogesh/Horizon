@@ -189,11 +189,12 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             ): WebResourceResponse? {
                 val requestUrl = request.url.toString()
                 Log.d("WEB_REQ", requestUrl)
+                val pageUrl = webView.url ?: currentTabUrl.orEmpty()
                 if (requestUrl.contains(".mp4", ignoreCase = true) || requestUrl.contains(".m3u8", ignoreCase = true)) {
-                    currentPlayingVideoUrl = requestUrl
+                    VideoSniffer.add(requestUrl, pageUrl)
+                    currentPlayingVideoUrl = VideoSniffer.getBest()?.url ?: requestUrl
                     recordDetectedMediaUrl(requestUrl)
                 }
-                val pageUrl = webView.url ?: currentTabUrl.orEmpty()
                 val isAdRequest = isAdBlockEnabled && isThirdParty(requestUrl, pageUrl) && adBlocker.isAdUrl(requestUrl)
                 return if (isAdRequest) {
                     DebugStats.blocked += 1
@@ -227,6 +228,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
                 isPageLoading = true
                 currentPlayingVideoUrl = null
                 detectedVideoUrls.clear()
+                VideoSniffer.clear()
                 updateVideoActionButton()
                 loadingProgress.progress = 0
                 loadingProgress.visibility = View.VISIBLE
@@ -495,31 +497,26 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         return container
     }
 
-    private fun buildVideoCandidates(onReady: (List<VideoCandidate>) -> Unit) {
+    private fun buildVideoCandidates(onReady: (List<VideoCandidateUi>) -> Unit) {
         collectVideoCandidatesFromPage {
-            val immediate = currentPlayingVideoUrl?.takeIf { it.isNotBlank() }
-            if (!immediate.isNullOrBlank()) {
-                synchronized(detectedVideoUrls) { detectedVideoUrls.add(immediate) }
-            }
-
             Thread {
-                val urls = synchronized(detectedVideoUrls) { detectedVideoUrls.toList() }
-                val candidates = urls.mapNotNull { url -> buildVideoCandidate(url) }
-                    .sortedByDescending { it.score }
+                val candidates = VideoSniffer.all()
+                    .mapNotNull { candidate -> buildVideoCandidate(candidate) }
+                    .sortedByDescending { it.candidate.score }
                 runOnUiThread { onReady(candidates) }
             }.start()
         }
     }
 
-    private fun buildVideoCandidate(url: String): VideoCandidate? {
-        if (!isDirectPlayableMediaUrl(url)) return null
-        val size = probeContentLength(url)
-        val contentType = probeContentType(url)
-        if (!isLikelyPlayableVideo(url, contentType)) return null
-        return VideoCandidate(url = url, sizeBytes = size, score = scoreVideoCandidate(url))
+    private fun buildVideoCandidate(candidate: VideoCandidate): VideoCandidateUi? {
+        if (!isDirectPlayableMediaUrl(candidate.url)) return null
+        val size = probeContentLength(candidate.url)
+        val contentType = probeContentType(candidate.url)
+        if (!isLikelyPlayableVideo(candidate.url, contentType)) return null
+        return VideoCandidateUi(candidate = candidate, sizeBytes = size)
     }
 
-    private fun showVideoCandidatePopup(anchor: View, candidates: List<VideoCandidate>) {
+    private fun showVideoCandidatePopup(anchor: View, candidates: List<VideoCandidateUi>) {
         currentFloatingMenu?.dismiss()
 
         val content = LinearLayout(this).apply {
@@ -562,14 +559,14 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         currentFloatingMenu = popup
     }
 
-    private fun createVideoCandidateRow(candidate: VideoCandidate): View {
+    private fun createVideoCandidateRow(candidate: VideoCandidateUi): View {
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
 
         val title = TextView(this).apply {
-            text = FileUtils.filenameFromUrl(candidate.url, "video")
+            text = FileUtils.filenameFromUrl(candidate.candidate.url, "video")
             setTextColor(Color.parseColor("#E6ECD7"))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         }
@@ -587,7 +584,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         val play = MaterialButton(this).apply {
             text = getString(R.string.action_watch)
             setOnClickListener {
-                openNativeVideoPlayer(candidate.url)
+                openNativeVideoPlayer(candidate.candidate.url)
                 currentFloatingMenu?.dismiss()
             }
         }
@@ -595,7 +592,7 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
             text = getString(R.string.action_download)
             setOnClickListener {
                 currentFloatingMenu?.dismiss()
-                downloadMedia(candidate.url)
+                downloadMedia(candidate.candidate.url)
             }
         }
 
@@ -1070,39 +1067,19 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
     }
 
     private fun resolveActionableVideoUrl(): String? {
-        val candidates = mutableListOf<String>()
-        currentPlayingVideoUrl?.let { candidates.add(it) }
-        synchronized(detectedVideoUrls) {
-            candidates.addAll(detectedVideoUrls)
-        }
-        return candidates
-            .distinct()
-            .map { candidate -> VideoCandidate(candidate, null, scoreVideoCandidate(candidate)) }
-            .filter { isDirectPlayableMediaUrl(it.url) }
-            .maxByOrNull { it.score }
-            ?.url
+        return VideoSniffer.getBest()?.url
     }
 
     private fun recordDetectedMediaUrl(url: String) {
         if (adBlocker.isAdUrl(url)) return
         if (!isDirectPlayableMediaUrl(url)) return
+        VideoSniffer.add(url, webView.url ?: currentTabUrl.orEmpty())
         DebugStats.videoDetected += 1
         Log.d("VIDEO_CANDIDATE", url)
         synchronized(detectedVideoUrls) {
             detectedVideoUrls.add(url)
         }
         runOnUiThread { updateVideoActionButton() }
-    }
-
-    private fun scoreVideoCandidate(url: String): Int {
-        val lower = url.lowercase(Locale.US)
-        var score = 0
-        if (lower.contains(".m3u8")) score += 50
-        if (lower.contains("1080")) score += 40
-        if (lower.contains("720")) score += 30
-        if (lower.contains("ads") || lower.contains("doubleclick")) score -= 100
-        if (lower.contains("preview")) score -= 50
-        return score
     }
 
     private fun isThirdParty(requestUrl: String, mainUrl: String): Boolean {
@@ -1175,10 +1152,9 @@ class BrowserTabActivity : AppCompatActivity(), SharedPreferences.OnSharedPrefer
         val onClick: () -> Unit
     )
 
-    private data class VideoCandidate(
-        val url: String,
-        val sizeBytes: Long?,
-        val score: Int
+    private data class VideoCandidateUi(
+        val candidate: VideoCandidate,
+        val sizeBytes: Long?
     )
 
     private inner class BrowserJsBridge {
